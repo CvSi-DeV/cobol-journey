@@ -32,3 +32,9 @@
 ## Confiance
 
 10/10
+
+## RESULTATS D'EXECUTION
+
+```
+HELLO COBOL WORLD !
+```
