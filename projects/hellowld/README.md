@@ -9,15 +9,17 @@ Premier programme du parcours : un programme minimal qui pose les bases de la st
 ## Compilation & exécution
 
 ```bash
-cobc -xj HELLOWLD.cob
+cobc -std=ibm -xj HELLOWLD.cob
 ```
 
 Ou en deux étapes :
 
 ```bash
-cobc -x HELLOWLD.cob -o hellowld
+cobc -std=ibm -x HELLOWLD.cob -o hellowld
 ./hellowld
 ```
+
+`-std=ibm` aligne le compilateur sur le dialecte Enterprise COBOL (z/OS) plutôt que le dialecte GnuCOBOL par défaut.
 
 ## Sortie attendue
 

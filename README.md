@@ -48,8 +48,10 @@ Ce dépôt documente ce pivot : chaque projet est un jalon vers un objectif conc
 La commande compile et exécute le programme.
 
 ```bash
-cobc -xj fichier.cob
+cobc -std=ibm -xj fichier.cob
 ```
+
+`-std=ibm` aligne le comportement du compilateur/runtime sur le dialecte Enterprise COBOL (z/OS) plutôt que le dialecte GnuCOBOL par défaut — évite des écarts de comportement silencieux (ex: `DISPLAY` d'un champ `PIC 9(5)V99` insère un point décimal par défaut sous GnuCOBOL, mais pas sous `-std=ibm`, fidèle au comportement mainframe réel).
 
 ## Contact
 

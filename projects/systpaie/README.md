@@ -29,19 +29,21 @@ Version actuelle : un seul employé, données codées en dur (pas de fichier, pa
 ## Compilation & exécution
 
 ```bash
-cobc -xj systpaie.cob
+cobc -std=ibm -xj systpaie.cob
 ```
 
 Ou en deux étapes :
 
 ```bash
-cobc -x systpaie.cob -o systpaie
+cobc -std=ibm -x systpaie.cob -o systpaie
 ./systpaie
 ```
 
+`-std=ibm` aligne le compilateur sur le dialecte Enterprise COBOL (z/OS) plutôt que le dialecte GnuCOBOL par défaut — notamment, `DISPLAY` d'un champ `PIC 9(5)V99` n'insère pas de point décimal (décimale implicite, comme sur mainframe).
+
 ## Exemple de sortie
 
-Pour un brut de 3200,00 (tranche à 11 %) :
+Pour le brut actuellement codé en dur (8000,00 — tranche à 41 %), compilé avec `-std=ibm` :
 
 ```
 -----------------------------
@@ -50,16 +52,18 @@ Pour un brut de 3200,00 (tranche à 11 %) :
 - NOM : CONTRIB
 - PRENOM : MICHELE
 -----------------------------
-- SALAIRE BRUT     :03200.00
+- SALAIRE BRUT     : 0800000
 --
-- COTISATIONS      :00704.00
-- BASE IMPOSABLE   :02496.00
-- TAUX IMPOT       :11%
-- IMPOT            :00274.56
+- COTISATIONS      : 0176000
+- BASE IMPOSABLE   : 0624000
+- TAUX IMPOT       : 41%
+- IMPOT            : 0255840
 --
-- SALAIRE NET      :02221.44
+- SALAIRE NET      : 0368160
 -----------------------------
 ```
+
+Sans `-std=ibm`, le même montant s'afficherait `08000.00` (point décimal inséré par le dialecte GnuCOBOL par défaut).
 
 ## Concepts démontrés
 
