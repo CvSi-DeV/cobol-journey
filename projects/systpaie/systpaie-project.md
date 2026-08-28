@@ -5,6 +5,14 @@
 - EVALUATE
 - Structure / Record
 - LESS THAN OR EQUAL TO
+- Lecture `LINE SEQUENTIAL`
+- Ecriture
+- `OPEN` `READ` `WRITE` `CLOSE`
+- FILE STATUS
+- `STRING` pour Concatener;
+- `INITIALIZE` pour mettre à blanc un PIC X()
+- `MOVE` de groupe à groupe
+- `PERFORM` pour appeler un paragraphe - Factorisation du code
 
 ## Challenge
 
@@ -81,20 +89,31 @@ Tester au moins 4 valeurs de brut pour valider chaque branche de l'`EVALUATE` (u
 
 Noter les résultats obtenus dans ce fichier (section Apprentissage/Temps) pour vérifier qu'ils sont cohérents à la main (calcul de contrôle au brouillon ou tableur).
 
-### Hors scope pour cette version (à venir plan Semaine 3-4)
+V2 : l'exécution crée le fichier rapport-fp.txt
+
+### Scope de la V2
 
 - Lire plusieurs employés depuis un fichier (`OCCURS`, tables).
 - Écrire un rapport de sortie.
 
+### Bug rencontré (V2) : boucle infinie via FILE STATUS
+
+`CLOSE` sur un fichier avec `FILE STATUS IS ...` met aussi à jour cette variable
+(pas seulement `READ`). Fermer le fichier à l'intérieur du `AT END` écrase le code
+'10' (fin de fichier) par le code du `CLOSE` lui-même, cassant la condition de la
+`PERFORM UNTIL`. Fix : sortir les `CLOSE` après le `END-PERFORM`
+
 ## Temps
 
 - 1h30
+- V2 : 1h30
 
 ## Confiance
 
 - 9/10
+- V2 : 8/10
 
-## RESULTATS D'EXECUTION
+## RESULTATS D'EXECUTION V1
 
 ```
 --------------------------
@@ -161,3 +180,27 @@ Noter les résultats obtenus dans ce fichier (section Apprentissage/Temps) pour 
 - SALAIRE NET      :03681.60
 --------------------------
 ```
+
+## RESULTATS D'EXECUTION V2
+
+Rapport généré à l'exécution dans `rapport-fp.txt` (non versionné — fichier généré, régénérable en relançant le programme). Extrait (1 employé sur 8 traités) :
+
+```
+-----------------------------
+------ FICHE DE PAIE --------
+-----------------------------
+- NOM : DUPONT
+- PRENOM : JEAN
+-----------------------------
+- SALAIRE BRUT     : 0320000
+--
+- COTISATIONS      : 0070400
+- BASE IMPOSABLE   : 0249600
+- TAUX IMPOT       : 11%
+- IMPOT            : 0027456
+--
+- SALAIRE NET      : 0222144
+-----------------------------
+```
+
+Nombre d'employés traités : 8
