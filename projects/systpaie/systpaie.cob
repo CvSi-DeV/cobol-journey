@@ -30,7 +30,7 @@
            MOVE "MICHELE" TO PRENOM
            MOVE "CONTRIB" TO NOM
            MOVE 8000 TO SALAIRE-BRUT
-       .
+
 
       *> Calcul de cotisation
            COMPUTE COTISATION = SALAIRE-BRUT * 22 / 100.
