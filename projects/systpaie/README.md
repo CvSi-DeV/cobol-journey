@@ -1,8 +1,12 @@
 # Système de Paie — Calcul Brut → Net
 
-Programme COBOL qui calcule le salaire net d'un employé à partir du salaire brut, avec cotisations sociales et impôt simplifié par tranches.
+Programme COBOL qui lit une liste d'employés depuis un fichier, calcule le salaire net de chacun (cotisations sociales + impôt simplifié par tranches), et écrit un rapport de sortie.
 
-Version actuelle : un seul employé, données codées en dur (pas de fichier, pas de saisie utilisateur).
+Version actuelle (V2) : lecture multi-employés depuis `employes.dat` (format ligne fixe), traitement au fil de l'eau (lecture → calcul → écriture, un employé à la fois), écriture du rapport dans `rapport-fp.txt`.
+
+## Évolution du programme
+
+**V1** : un seul employé, données codées en dur (pas de fichier, pas de saisie utilisateur).
 
 ## Règles métier
 
@@ -25,6 +29,7 @@ Version actuelle : un seul employé, données codées en dur (pas de fichier, pa
 ## Prérequis
 
 - [GnuCOBOL](https://gnucobol.sourceforge.io/) installé (`cobc --version` pour vérifier)
+- Un fichier `employes.dat` présent dans le dossier (format : prénom `PIC X(25)`, nom `PIC X(25)`, salaire brut `PIC 9(5)V99`, une ligne par employé)
 
 ## Compilation & exécution
 
@@ -41,29 +46,29 @@ cobc -std=ibm -x systpaie.cob -o systpaie
 
 `-std=ibm` aligne le compilateur sur le dialecte Enterprise COBOL (z/OS) plutôt que le dialecte GnuCOBOL par défaut — notamment, `DISPLAY` d'un champ `PIC 9(5)V99` n'insère pas de point décimal (décimale implicite, comme sur mainframe).
 
+Le programme lit `employes.dat`, affiche le nombre d'employés traités, et génère `rapport-fp.txt` (fichier gitignoré, régénérable à chaque exécution).
+
 ## Exemple de sortie
 
-Pour le brut actuellement codé en dur (8000,00 — tranche à 41 %), compilé avec `-std=ibm` :
+Extrait de `rapport-fp.txt` pour un employé (brut 3200,00 — tranche à 11 %) :
 
 ```
 -----------------------------
 ------ FICHE DE PAIE --------
 -----------------------------
-- NOM : CONTRIB
-- PRENOM : MICHELE
+- NOM : DUPONT
+- PRENOM : JEAN
 -----------------------------
-- SALAIRE BRUT     : 0800000
+- SALAIRE BRUT     : 0320000
 --
-- COTISATIONS      : 0176000
-- BASE IMPOSABLE   : 0624000
-- TAUX IMPOT       : 41%
-- IMPOT            : 0255840
+- COTISATIONS      : 0070400
+- BASE IMPOSABLE   : 0249600
+- TAUX IMPOT       : 11%
+- IMPOT            : 0027456
 --
-- SALAIRE NET      : 0368160
+- SALAIRE NET      : 0222144
 -----------------------------
 ```
-
-Sans `-std=ibm`, le même montant s'afficherait `08000.00` (point décimal inséré par le dialecte GnuCOBOL par défaut).
 
 ## Concepts démontrés
 
@@ -72,9 +77,12 @@ Sans `-std=ibm`, le même montant s'afficherait `08000.00` (point décimal insé
 - `COMPUTE` pour les calculs arithmétiques
 - `EVALUATE TRUE` pour sélectionner une tranche d'imposition
 - `FUNCTION TRIM` pour l'affichage des chaînes
+- Fichiers séquentiels : `OPEN`/`READ`/`WRITE`/`CLOSE`, `FILE STATUS`
+- `PERFORM UNTIL` + `AT END`/`NOT AT END` pour boucler sur un fichier
+- `STRING`/`INITIALIZE` pour construire les lignes du rapport
+- `PERFORM nom-paragraphe` pour factoriser l'écriture (paragraphe `2000-WRITE-RECORDS`)
 
 ## Limites connues / à venir
 
-- Un seul employé, données codées en dur
-- Pas de lecture de fichier ni de saisie utilisateur
-- Traitement multi-employés (fichier, `OCCURS`, tables) et rapport de sortie prévus dans un prochain projet
+- Traitement au fil de l'eau (pas de table en mémoire via `OCCURS`) — choix assumé pour ce projet
+- Pas de gestion d'erreurs `FILE STATUS` avancée (fichier absent, erreur de lecture)
