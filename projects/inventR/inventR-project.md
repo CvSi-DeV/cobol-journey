@@ -73,18 +73,56 @@ Le jeu de données fourni (`commandes.dat`) est construit pour couvrir :
 
 Noter les résultats obtenus dans ce fichier (section Temps/Confiance) et vérifier à la main que le rapport correspond bien aux règles métier.
 
+## Bugs rencontrés
+
+1. **`PERFORM VARYING ... UNTIL` teste la condition avant chaque itération** — `UNTIL I-COMMANDE = LS-NB-COMMANDES` sautait le traitement du dernier élément de la table (la boucle s'arrête dès que la condition devient vraie, sans exécuter le corps une dernière fois). Fix : `UNTIL I-COMMANDE > LS-NB-COMMANDES`.
+2. **`REWRITE` vs `WRITE`** — `REWRITE` suppose un enregistrement déjà écrit, dans un fichier ouvert en `I-O`. Le fichier rapport est ouvert en `OUTPUT` (création), donc chaque ligne doit être ajoutée avec `WRITE`. Symptôme observé : `rapport-inventaire.txt` généré mais vide (0 octet).
+3. **Index périmé après la boucle de recherche** — dans `PRODUIT-NON-TROUVE`, appelé après la sortie de la boucle de recherche du produit, `LS-PCODE(I-PRODUIT)` ne pointait plus vers une donnée pertinente. Fix : utiliser `LS-CCODE(I-COMMANDE)`, la donnée réellement recherchée.
+4. **Cohérence de sizing `OCCURS`/compteur** — `LS-NB-PRODUITS`/`LS-NB-COMMANDES` en `PIC 9(3)` (jusqu'à 999) alors que les tables étaient bornées à `OCCURS 100 TIMES` : un fichier d'entrée de plus de 100 lignes aurait écrit hors table. Aligné à `OCCURS 999 TIMES`.
+
 ## Apprentissage
 
-_(à compléter au fil du projet)_
+    - Pour qualifier un nom d'élement ambigu dans deux record, il faut utiliser IN ou OF (interchangeable), je prefere personnellement IN
+
+    - Pour manipuler les variables index (dans les records). C'est optimiser pour. Eviter "ADD 1 TO index"
+
+    ```cobol
+    SET `index` UP BY 1
+    ```
+
+    - L'importance du positionnement dans l'arborescence pour compiler et executer le programme
+    - différence entre WRITE et REWRITE ainsi leur cas d'utilisation
 
 ## Challenge
 
-_(à compléter)_
+gestion des index : rappel que la condition est pre-evaluée.
 
 ## Temps
 
-_(à compléter)_
+5h
 
 ## Confiance
 
-_(à compléter)_
+7,5/10
+
+## Limites connues / à venir
+
+- Le stock décrémenté (`LS-RSTOCK-FINAL`) n'est calculé que pour le rapport (`rapport-inventaire.txt`) — il n'est jamais réécrit dans `produits.dat` via `REWRITE`. Choix assumé : `REWRITE` sur le fichier d'entrée modifierait `produits.dat` à chaque exécution, cassant la reproductibilité des tests (le fichier de référence deviendrait un état mutable au lieu d'un jeu de données fixe rejouable). La clause `REWRITE` sera pratiquée séparément dans `projects/playground/`, sur un fichier dédié à cet usage plutôt que sur les données de test d'un projet portfolio.
+
+## Résultats d'exécution
+
+Extrait de `rapport-inventaire.txt`, conforme aux 4 cas de test prévus (voir section Tests à documenter) :
+
+```
+ACCEPTEE PROD01CLAVIER MECANIQUE   00040
+ACCEPTEE PROD02SOURIS SANS FIL     00000
+REFUSEE  PROD03ECRAN 27 POUCES     00003
+REFUSEE  PROD99Produit Non trouve  00000
+```
+
+| Commande                            | Attendu                     | Obtenu |
+| ----------------------------------- | --------------------------- | ------ |
+| PROD01, qté 10 (stock 50)           | Acceptée, stock final 40    | ✅     |
+| PROD02, qté 5 (stock 5, cas limite) | Acceptée, stock final 0     | ✅     |
+| PROD03, qté 10 (stock 3)            | Refusée, stock inchangé 3   | ✅     |
+| PROD99 (inconnu)                    | Refusée, produit non trouvé | ✅     |
