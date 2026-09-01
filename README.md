@@ -55,4 +55,4 @@ cobc -std=ibm -xj fichier.cob
 
 ## Contact
 
-mail : contact via GitHub
+Via mon profil GitHub : [@CvSi-DeV](https://github.com/CvSi-DeV)

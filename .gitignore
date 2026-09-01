@@ -3,6 +3,8 @@
 *.exe
 *.cob.out
 .DS_Store
+#Stratégie/plan personnel — pas destiné au repo public
+.plan/
 #Playground
 projects/playground/datas/dataplay
 projects/playground/if-statement/ifstat
