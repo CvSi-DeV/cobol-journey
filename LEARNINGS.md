@@ -22,12 +22,23 @@
 - `INITIALIZE` pour remettre à blanc un `PIC X(n)` avant reconstruction
 - `PERFORM nom-paragraphe` pour factoriser un bloc de code répété (pas un `CALL` de sous-programme externe, juste un paragraphe du même `PROCEDURE DIVISION`)
 - `OPEN OUTPUT` / `WRITE` pour générer un fichier de sortie (rapport), en plus de la lecture déjà pratiquée
+- `OCCURS ... DEPENDING ON ... INDEXED BY` pour une table de taille variable (chargement en mémoire d'un fichier lu séquentiellement)
+- Gérer **deux fichiers en lecture simultanée** : deux `FILE STATUS` distincts à ne pas confondre
+- `IN` / `OF` pour qualifier un nom de champ ambigu entre deux records (interchangeables, préférence perso pour `IN`)
+- `WRITE` (créer un enregistrement, fichier en `OUTPUT`) vs `REWRITE` (remplacer un enregistrement déjà écrit, fichier en `I-O`) — les confondre ne plante pas forcément, mais ne produit rien d'utile
+- `SET index UP BY 1` existe comme alternative à `ADD 1 TO index` pour manipuler une variable `INDEXED BY` (vu en apprentissage, pas encore pratiqué dans un programme)
 
 ## Blockers
 
 - Résolu : boucle infinie dans `systpaie.cob` v2 — `CLOSE` sur un fichier avec `FILE STATUS IS ...` met à jour cette même variable (pas seulement `READ`). Fermer le fichier à l'intérieur du `AT END` écrasait le code `'10'` (fin de fichier) par le code de retour du `CLOSE`, cassant la condition de sortie du `PERFORM UNTIL`. Fix : sortir les `CLOSE` après le `END-PERFORM`, jamais à l'intérieur d'une branche testée par la condition de boucle.
+- Résolu : sur `inventR.cob`, confusion d'indices entre deux tables
+- Résolu : `PERFORM VARYING ... UNTIL` est **pré-évalué** (condition testée avant chaque itération, y compris la première) → `UNTIL I = N` saute le traitement du dernier élément de la table ; il faut `UNTIL I > N`.
+- Résolu : cohérence de sizing entre le compteur (`PIC 9(3)`, jusqu'à 999) et la borne de la table (`OCCURS 100 TIMES`) — un dépassement du nombre de lignes en entrée aurait pu écrire hors table.
 
 ## Next
 
 - Projet 2 (Système de Paie) v2 : lecture multi-employés (`employes.dat`), calcul et écriture d'un rapport — fait, bug corrigé
-- Démarrer le Projet 3 (Gestionnaire d'Inventaire) — fichiers séquentiels, I/O, `FILE STATUS` en gestion d'erreurs réelle
+- Projet 3 (Gestionnaire d'Inventaire) : fichiers séquentiels multiples, tables `OCCURS`, `FILE STATUS` en gestion d'erreurs réelle (cas fichier absent) — fait, validé sur 4 cas de test
+- Repo GitHub public créé (`cobol-journey`)
+- Démarrer le Projet 4 (Refactoring Prod) — copybooks, sous-programmes (`CALL`, `LINKAGE SECTION`)
+- A traiter séparément : organisation `INDEXED`/`RELATIVE FILE` (non pratiquée sur le Projet 3), pratique de la clause `REWRITE` sur un fichier dédié en playground

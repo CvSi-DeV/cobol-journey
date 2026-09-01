@@ -32,7 +32,7 @@ Ce dépôt documente ce pivot : chaque projet est un jalon vers un objectif conc
 | ---------------------------------------------- | ----- | --------------------------------------------- | ------------- |
 | 1. [Hello World](projects/hellowld/README.md)  | 1     | Setup + syntaxe + Déploiement simple          | ✅ terminé    |
 | 2. [Système Paie](projects/systpaie/README.md) | 1 - 2 | Variables, logique, Calculs financiers        | ✅ terminé    |
-| 3. [Inventaire](projects/inventR/README.md)    | 2     | Fichiers I/O, traitement batch                | 👨‍💻 en cours   |
+| 3. [Inventaire](projects/inventR/README.md)    | 2     | Fichiers I/O, traitement batch                | ✅ terminé    |
 | 4. Refactoring Prod                            | 2     | Copybooks, sous-programmes, code réutilisable | 🚧 non débuté |
 | 5. API COBOL (REST)                            | 2     | Intégrations modernes                         | 🚧 non débuté |
 | 6. E-commerce Complet                          | 2     | Everything + BD                               | 🚧 non débuté |
