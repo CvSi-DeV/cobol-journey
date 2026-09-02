@@ -5,7 +5,7 @@ COB = cobc
 COBFLAGS = -x -std=ibm
 HELLOWLD = hellowld
 
-.PHONY:  all clean build  run 
+.PHONY:  all clean build run 
 
 all : hellowld
 
