@@ -1,5 +1,7 @@
 # COBOL - JOURNEY
 
+![License](https://img.shields.io/github/license/CvSi-DeV/cobol-journey)
+
 _**Expert legacy COBOL spécialisé intégration moderne.
 Expérience Z/OS, IBM i, Java.
 Je lis le COBOL legacy, je l'optimise, et je le branche aux APIs modernes**_
