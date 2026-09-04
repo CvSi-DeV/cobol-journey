@@ -27,6 +27,7 @@
 - `IN` / `OF` pour qualifier un nom de champ ambigu entre deux records (interchangeables, préférence perso pour `IN`)
 - `WRITE` (créer un enregistrement, fichier en `OUTPUT`) vs `REWRITE` (remplacer un enregistrement déjà écrit, fichier en `I-O`) — les confondre ne plante pas forcément, mais ne produit rien d'utile
 - `SET index UP BY 1` existe comme alternative à `ADD 1 TO index` pour manipuler une variable `INDEXED BY` (vu en apprentissage, pas encore pratiqué dans un programme)
+- Makefile pour les projets
 
 ## Blockers
 
@@ -42,3 +43,20 @@
 - Repo GitHub public créé (`cobol-journey`)
 - Démarrer le Projet 4 (Refactoring Prod) — copybooks, sous-programmes (`CALL`, `LINKAGE SECTION`)
 - A traiter séparément : organisation `INDEXED`/`RELATIVE FILE` (non pratiquée sur le Projet 3), pratique de la clause `REWRITE` sur un fichier dédié en playground
+
+## Semaine 5 — Makefile & Organisation de fichiers
+
+- Makefile : anatomie `cible: prérequis` + recette tabulée (jamais d'espaces), `.PHONY` pour les cibles sans fichier produit, variables (`$(VAR)`) et variables automatiques (`$@`, `$<`, `$^`)
+- Dépendance make = comparaison de timestamps : ne pas mettre une donnée d'exécution (ex: fichier `.dat`) en prérequis d'une cible de *compilation*, sinon recompilation inutile à chaque changement de donnée
+- Forcer `clean` en prérequis de `build`/`run` casse l'incrémentalité de make (recompile tout, tout le temps) — garder `clean`/`rebuild` comme cibles séparées, jamais dans la chaîne de dépendance par défaut
+- Modes d'ouverture fichier complets : `INPUT`/`OUTPUT`/`I-O`/`EXTEND` — `REWRITE` exige `I-O`
+- `SELECT OPTIONAL` permet un `OPEN I-O` même si le fichier n'existe pas encore (sinon code `FILE STATUS '35'`, fichier introuvable) ; code `'05'` = fichier optionnel créé à l'ouverture
+- `ORGANIZATION IS INDEXED` / `RELATIVE` : accès direct par clé métier (`RECORD KEY`) ou par position (`RELATIVE KEY`), en plus du séquentiel déjà pratiqué — produit un fichier **binaire** (format dépendant du moteur GnuCOBOL, ici Berkeley DB), pas du texte ; utilitaire `db_dump` pour l'inspecter en clair
+- `RECORD KEY` doit désigner un champ de la `FILE SECTION`, jamais une variable `WORKING-STORAGE`/`LOCAL-STORAGE`
+- Pour une clé par élément d'une table `OCCURS`, le champ clé doit être **imbriqué à l'intérieur** de l'occurrence (niveau inférieur), pas en frère avec un `REDEFINES` de la table entière
+- `INDEXED BY` crée un nom d'index spécial : ne pas le redéclarer comme variable normale ailleurs (conflit de nom)
+- `SORT nom-table ASCENDING KEY champ` : tri d'une table en mémoire (existe aussi pour les fichiers, mais ici sur `WORKING-STORAGE`)
+- `SEARCH ALL` (recherche dichotomique) exige `ASCENDING`/`DESCENDING KEY` + `INDEXED BY` sur la table — **`ASCENDING KEY` ne trie pas automatiquement**, c'est une promesse faite au compilateur : la donnée doit être triée par le programme avant l'appel
+- Piège GnuCOBOL (3.2) constaté : `SEARCH ALL` avec un `WHEN` combinant deux champs par `AND` ne trouve rien même sur données triées ; contournement fiable : une seule clé combinée (`REDEFINES` d'un champ unique) plutôt que deux comparaisons de champs
+- Une variable `FILE STATUS` est écrasée à **chaque** opération fichier (`OPEN`, `READ`, `WRITE`, `REWRITE`...) — pour retenir le statut d'une opération précise (ex: l'`OPEN`) en vue d'une condition plus tard dans une boucle, la copier dans une variable dédiée avant qu'elle ne soit réécrite par l'opération suivante
+- Discipline à renforcer : vérifier `FILE STATUS` après **chaque** instruction fichier qui peut échouer, pas seulement au moment où un plantage devient visible (même bug racine rencontré 3 fois sous des formes différentes sur un seul exercice avant d'être fixé à la source)

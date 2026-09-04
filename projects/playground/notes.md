@@ -40,3 +40,19 @@ Pas un projet numéroté du plan (`.plan/plan.md`) — pas de template de suivi 
   - `DISPLAY` d'un champ `PIC 9(5)V99` insère un point décimal par défaut avec GnuCOBOL (`08000.00`), mais pas avec l'option de compilation `-std=ibm` (`0800000`, décimale implicite non affichée, fidèle au runtime z/OS). **Compiler systématiquement avec `-std=ibm`** pour rester fidèle à l'environnement cible — adopté comme convention dans les README du repo.
 
 - 2026-08-28 : bonus `lectucsv.cob` — fiche de paie complète calculée pour chaque employé du CSV, en reprenant telle quelle la logique métier de `systpaie.cob` (cotisations 22 %, tranches EVALUATE, impôt, net) appliquée à `SALAIRE-BRUT(LS-ID-EMPLOYES)` dans la boucle de lecture. Résultats croisés avec les cas déjà documentés dans `systpaie-project.md` (bruts 3200 et 8000) — valeurs identiques, calculs corrects. Logique dupliquée entre les deux programmes pour l'instant (pas de copybook/sous-programme partagé) — normal à ce stade, sera reconsidéré Semaine 5-6 du plan (Copybooks, `CALL`).
+
+- 2026-09-02 : lecon sur le makefile. Realisation des makefiles des projets (hors playground)
+- 2026-09-03 :
+  - OPEN OUTPUT crée le fichier si il n'existe pas
+  - OPEN I-O le fichier doit exister
+    sinon le SELECT du fichier doit etre OPTIONAL. avec la clause OPTIONAL, le fichier peut etre créé si il n'existe pas
+  - REWRITE seulement applicable sur une ouverture I-O ou Extends
+  - Une organisation INDEXED produit un fichier binaire.
+  - la variable INDEXED BY dans un record n'a pas besoin de déclaration
+
+  - **REX exercice `navalbat` (bataille navale, `REWRITE` + fichier `INDEXED`) :**
+    - Acquis solide : `REWRITE` (objectif initial de l'exercice, rattraper ce qui manquait sur `inventR`) — usage et prérequis bien compris, testé à plusieurs reprises.
+    - Acquis bonus (au-delà de la consigne) : `SORT` sur table en mémoire + `SEARCH ALL` avec clé composée (`REDEFINES` en clé unique 4 chiffres pour contourner un bug GnuCOBOL du `WHEN ... AND ...` sur deux champs).
+    - Point de vigilance identifié : le même bug racine est revenu 3 fois sous des formes différentes (génération de grille silencieusement cassée, `READ` échoué réutilisant une donnée périmée, `LS-FS-GRILLE` réutilisée comme condition alors qu'elle change à chaque opération fichier) — `FILE STATUS` vérifié seulement au moment où ça plante visiblement, pas systématiquement après chaque `READ`/`WRITE`/`REWRITE`. À travailler : en faire un réflexe d'écriture, pas une étape de debug après coup.
+    - Progression notée sur le débogage autonome : premier bug de l'exercice (erreur de compilation `RECORD KEY`) résolu avec questions guidées nécessaires ; dernier bug (`LS-FS-GRILLE` périmée) diagnostiqué correctement avant la fin des questions guidées.
+    - Écart assumé à la consigne initiale : contrainte "recherche séquentielle dans le fichier" contournée par un accès direct `INDEXED`/`RECORD KEY` — reporté à l'Exercice 3 (fichier `INDEXED`, pratique du `READ` séquentiel sans clé en complément du `READ ... KEY IS`).
