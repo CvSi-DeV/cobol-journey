@@ -28,7 +28,6 @@
        01 LS-FS-CRENEAUX  PIC X(2).
        01 LS-RK-CRENEAUX  PIC 9(3).
        01 LS-FILE-STATUS  PIC X(2).
-       01 LS-COUNT        PIC 9(2).
 
        PROCEDURE DIVISION.
       *>   Ecriture initiale des créneaux. 
