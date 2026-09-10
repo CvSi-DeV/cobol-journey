@@ -64,3 +64,26 @@ Pas un projet numéroté du plan (`.plan/plan.md`) — pas de template de suivi 
     `INVALID KEY` / `NOT INVALID KEY` ajouté sur le `READ` de `MOD-REWRITE` (le `FILE STATUS` n'était pas vérifié avant le `REWRITE`.
     constante `CST-FS-EOF` ajoutée pour remplacer le littéral `"10"`.
   - `Makefile` vérifié : compile (`cobc -x -std=ibm`), `make run` nettoie `creneaux.dat` avant exécution — comportement conforme.
+
+- 2026-09-09 : **Exercice indexedf manipulation des fichiers indexe**
+  - Acquis : UPSERT PATTERN toujours lire pour positionner la clé avant le REWRITE : les compilateurs ne se comporte pas toujours de la meme facon notament au premier REWRITE juste après l'OPEN.
+  - niveau 88 pour créer le types booleen. C'est le conditon-name
+
+  ```cobol
+  01 boolean pic X.
+    88 boolean-state "O" FALSE "N".
+    ...
+    SET boolean-state TO TRUE
+    Set boolean-state TO FALSE
+    IF boolean-state THEN
+    ...
+    END-IF
+  ```
+
+  - Nouvelles notions par rapport à `navalbat`/`creneaux` : `DELETE` direct par clé (`RECORD KEY`, pas besoin de `READ` préalable en accès `DYNAMIC`, contrairement à `REWRITE`)
+
+  - **Complément (relecture) : Exercice 3 (`INDEXED`) — `indexedf.cbl`.**
+    ; `READ ... KEY IS` désormais systématiquement accompagné de `INVALID KEY`/`NOT INVALID KEY` (jusqu'ici pratiqué sans gestion d'erreur dans `navalbat`).
+    - Bug réel trouvé et corrigé : `PRODUCT-MOD` rouvrait le fichier (`OPEN I-O`) à **chaque itération** d'une boucle de ressaisie — sur GnuCOBOL ça n'a pas cassé visiblement (testé avec une saisie invalide suivie d'une valide), mais rouvrir un fichier déjà ouvert est un statut d'erreur en COBOL standard (`FILE STATUS "41"`) non garanti portable. Cause : faute d'inattention selon l'utilisateur. Corrigé en déplaçant l'`OPEN` avant la boucle (aligné sur le modèle déjà correct de `PRODUCT-DEL`), protégé par `IF FS-OK`. Même famille de point de vigilance que sur `navalbat` (`FILE STATUS` non vérifié systématiquement) — ici la correction a été immédiate et bien comprise, signe que le réflexe s'installe.
+    - Bonus non demandés, ajoutés spontanément après la revue : renommage `FS-FILE-MISSING` → `FS-FILE-CREATED` (plus fidèle au sens du code `"05"`, qui signifie que le fichier vient d'être créé, pas qu'il manque) ; `88 FS-END-OF-FILE VALUE "10"` introduit et réutilisé dans `READ-AND-DISPLAY` à la place d'un `PERFORM UNTIL 1 = 2` (boucle infinie déguisée) — cohérent avec l'idiome déjà utilisé dans `creneaux.cob` (`CST-FS-EOF`).
+    - Tout testé en exécution réelle (pas que lecture de code), y compris le chemin d'erreur (saisie d'un code produit invalide sur `PRODUCT-MOD`).
