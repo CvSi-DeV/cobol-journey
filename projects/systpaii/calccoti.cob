@@ -1,0 +1,20 @@
+      *> Calcul de cotisation
+       IDENTIFICATION DIVISION. 
+       PROGRAM-ID. CALCCOTI.
+
+       ENVIRONMENT DIVISION. 
+
+       DATA DIVISION. 
+       WORKING-STORAGE SECTION. 
+       01 WS-CONST-TX-COTISATION  PIC 9V99    VALUE 0.22.
+
+       LINKAGE SECTION. 
+       01 LK-SALAIRE-BRUT         PIC 9(5)V99.
+       01 LK-COTISATION           PIC 9(5)V99.
+       
+       PROCEDURE DIVISION USING LK-SALAIRE-BRUT LK-COTISATION.
+      *>   Calcul de cotisation 
+           COMPUTE LK-COTISATION =
+              LK-SALAIRE-BRUT * WS-CONST-TX-COTISATION 
+           GOBACK.
+       END PROGRAM CALCCOTI.

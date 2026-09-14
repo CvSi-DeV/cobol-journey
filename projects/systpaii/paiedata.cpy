@@ -1,0 +1,9 @@
+       01 PAIE-DATA OCCURS 500.
+          05 PRENOM           PIC X(25).
+          05 NOM              PIC X(25).
+          05 SALAIRE-BRUT     PIC 9(5)V99.
+          05 COTISATION       PIC 9(5)V99.
+          05 BASE-IMPOSABLE   PIC 9(5)V99.
+          05 TAUX-IMPOSITION  PIC 9V99.
+          05 IMPOT            PIC 9(5)V99.
+          05 SALAIRE-NET      PIC 9(5)V99.

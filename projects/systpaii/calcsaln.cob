@@ -1,0 +1,20 @@
+      *> Calcul du Salaire NET
+       IDENTIFICATION DIVISION. 
+       PROGRAM-ID. CALCSALN.
+
+       ENVIRONMENT DIVISION. 
+
+       DATA DIVISION. 
+       WORKING-STORAGE SECTION. 
+       LINKAGE SECTION. 
+       01 LK-BASE-IMPOSABLE  PIC 9(5)V99.
+       01 LK-IMPOT           PIC 9(5)V99.
+       01 LK-SALAIRE-NET     PIC 9(5)V99.
+       PROCEDURE DIVISION USING LK-BASE-IMPOSABLE
+                                LK-IMPOT
+                                LK-SALAIRE-NET.
+
+           COMPUTE LK-SALAIRE-NET = LK-BASE-IMPOSABLE - LK-IMPOT
+
+           GOBACK.
+       END PROGRAM CALCSALN.

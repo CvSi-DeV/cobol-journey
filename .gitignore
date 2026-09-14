@@ -27,3 +27,9 @@ projects/systpaie/systpaie-check.xlsx
 #InventR
 projects/inventR/inventR
 projects/inventR/rapport-inventaire.txt
+#systpaii
+projects/systpaii/*.dylib
+projects/systpaii/rapport-fp.txt
+projects/systpaii/systpaii
+#ZOpenEditor
+zapp.yaml
