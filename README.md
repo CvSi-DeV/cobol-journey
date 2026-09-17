@@ -36,7 +36,7 @@ Ce dépôt documente ce pivot : chaque projet est un jalon vers un objectif conc
 | 2. [Système Paie](projects/systpaie/README.md)                        | 1 - 2 | Variables, logique, Calculs financiers        | ✅ terminé    |
 | 3. [Inventaire](projects/inventR/README.md)                           | 2     | Fichiers I/O, traitement batch                | ✅ terminé    |
 | 4. [Système Paie 2](projects/systpaii/README.md) (Refactoring Prod)   | 2     | Copybooks, sous-programmes, code réutilisable | ✅ terminé    |
-| 5. [Simulateur de Pret](projects/simupret/README.md) API COBOL (REST) | 2     | Intégrations modernes                         | 🧑‍💻 en cours   |
+| 5. [Simulateur de Prêt](projects/simupret/README.md) API COBOL (REST) | 2     | Intégrations modernes                         | 🧑‍💻 en cours   |
 | 6. E-commerce Complet                                                 | 2     | Everything + BD                               | 🚧 non débuté |
 
 ## Stack et outils
