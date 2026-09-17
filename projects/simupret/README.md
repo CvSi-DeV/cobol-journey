@@ -14,7 +14,8 @@ Calcule la mensualité d'un prêt à taux fixe et annuités constantes à partir
 | --------------- | ----------------------------------------------------------------------------------------------|
 | `simupret.cob`  | Orchestrateur : saisie interactive de la demande, appels aux sous-programmes, affichage        |
 | `dempret.cpy`   | Copybook — structure de la demande de prêt (`TYPE-PRET` avec niveaux 88, `CAPITAL`, `DUREE-PRET-ANNEE`) |
-| `evaltaux.cob`  | Sous-programme — détermination du taux annuel selon le profil (type de prêt × tranche de durée) |
+| `tauxinter.cpy` | Copybook — enregistrement `TAUX-INTERET` (`TAUX-ANNUEL`/`TAUX-MENSUEL`), calculé une fois dans `evaltaux.cob` et partagé tel quel avec `calcmens.cob` (via `COPY ... REPLACING` pour adapter le préfixe par programme) |
+| `evaltaux.cob`  | Sous-programme — détermination du taux annuel et mensuel selon le profil (type de prêt × tranche de durée) |
 | `calcmens.cob`  | Sous-programme — calcul de la mensualité (formule d'annuités constantes)                       |
 
 Chaque sous-programme est compilé en module (`.dylib` sur macOS) et appelé depuis `simupret.cob` via `CALL 'NOM' USING ...`, `LINKAGE SECTION` pour recevoir les paramètres — même pattern que `systpaii` (Projet 4).
@@ -69,25 +70,26 @@ Bienvenue dans le simulateur de pret.
    Veuillez saisir le montant emprunté :
       (max 999 999.99)
    Veuillez saisir la durée du pret (années) :
-📈 Le taux est de :  3.45 %
-📈 Le taux mensuel est de : 0.00287
-💰 La mensualité est de   1154.17
+📈 Le taux annuel est de :  3.45 %
+📈 Le taux mensuel est de : 0.0028750 %
+💰 La mensualité est de   1154.79
 ```
 
-Autres cas vérifiés :
+Autres cas vérifiés (résultats confirmés à ±0,01 € près par un calcul indépendant, après correction de précision sur `TAUX-MENSUEL` — voir `simupret-project.md`) :
 
 | Type         | Capital     | Durée  | Taux   | Mensualité |
 | ------------ | ----------- | ------ | ------ | ---------- |
-| Immobilier   | 200 000,00 € | 20 ans | 3,45 % | 1 154,17 € |
-| Auto         | 25 000,00 €  | 5 ans  | 3,20 % | 451,36 €   |
-| Consommation | 8 000,00 €   | 3 ans  | 5,20 % | 240,48 €   |
+| Immobilier   | 200 000,00 € | 20 ans | 3,45 % | 1 154,79 € |
+| Auto         | 25 000,00 €  | 5 ans  | 3,20 % | 451,44 €   |
+| Consommation | 8 000,00 €   | 3 ans  | 5,20 % | 240,49 €   |
 
 ## Concepts démontrés (Étape 1)
 
 - Opérateur d'exponentiation `**` dans un `COMPUTE`
 - `EVALUATE TRUE ALSO TRUE` avec niveaux 88 combinés sur deux champs distincts, pour une grille de décision à deux critères
-- Sous-programmes (`CALL`/`LINKAGE SECTION`), copybook de structure de données partagée
+- Sous-programmes (`CALL`/`LINKAGE SECTION`), copybook de structure de données partagée, `COPY ... REPLACING` pour adapter les noms de champs au préfixe de chaque programme
 - `ROUNDED` sur un `COMPUTE` final pour un résultat monétaire — précision réglementaire en contexte bancaire/assurance
+- `ROUNDED` et nombre de décimales du `PICTURE` sont deux leviers indépendants : un taux mensuel stocké avec trop peu de décimales (`PIC 9V9(5)`) reste imprécis même arrondi, et l'erreur s'amplifie avec l'exponentiation sur un prêt long — corrigé en élargissant le `PICTURE` (`9V9(7)`), pas seulement en ajoutant `ROUNDED`
 
 ## Limites connues / à venir
 

@@ -2,7 +2,7 @@
 
 **Projet :** Projet 5 — Simulateur de prêt bancaire (`simupret`)
 **Étape :** 1 / 7 — Service COBOL, calcul de mensualité
-**Statut :** à développer
+**Statut :** terminé
 
 ## 1. Objectif
 

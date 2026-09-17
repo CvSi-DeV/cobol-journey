@@ -23,6 +23,7 @@
 1. **Exposant négatif sur champ non signé ignoré par `**`** — `LS-FACTEUR-CROISSANCE ** (- LS-NB-MENSUALITE)` renvoyait systématiquement `1.0000000000` au lieu de la valeur attendue (~0,85 sur le cas de test). Diagnostiqué par comparaison du code à la formule commentée, confirmé par le symptôme (résultat identique à un exposant nul), contourné en réécrivant la formule sans exposant négatif (`1 / (base ** n)`).
 2. **`ROUNDED` manquant sur le `COMPUTE` final de la mensualité** — la SFD l'exigeait explicitement, raté au premier passage, corrigé en revue. A changé le résultat (écart d'arrondi confirmé par l'utilisateur).
 3. **`.PHONY = cleanmodule clean` au lieu de `.PHONY : cleanmodule clean`** dans le `Makefile` — cibles listées comme phony non réellement protégées (bug silencieux tant qu'aucun fichier `clean`/`cleanmodule` n'existe dans le dossier).
+4. **`PICTURE` insuffisant sur `TAUX-MENSUEL` — `ROUNDED` seul n'a pas suffi** (fix post-clôture, découvert en préparant l'Étape 2). Le refacto du taux en enregistrement partagé `TAUX-INTERET` (`tauxinter.cpy`) a ajouté `ROUNDED` sur le calcul de `TAUX-MENSUEL`, mais le champ restait déclaré en `PIC 9V9(5)` (5 décimales) — insuffisant pour représenter certains taux mensuels sans perte (ex: `3,45 % / 12 = 0,002875`, qui a besoin de 6 décimales). `ROUNDED` n'a fait que déplacer l'erreur d'un côté à l'autre (mensualité passée de 1154,17 € à 1155,41 € au lieu de converger vers la valeur exacte), l'exponentiation `** n` amplifiant l'écart sur les prêts longs (240 mensualités). Diagnostiqué par comparaison à un calcul de référence indépendant (Python), pas par simple relecture de code. Corrigé en passant `TAUX-MENSUEL` à `PIC 9V9(7)` dans `tauxinter.cpy` (propagé à `calcmens.cob`) — les 3 cas de test retombent exactement sur la valeur mathématique exacte. **Leçon** : `ROUNDED` et le nombre de décimales du `PICTURE` sont deux leviers indépendants ; corriger l'un sans vérifier l'autre peut ne rien améliorer, voire déplacer l'erreur ailleurs.
 
 ## Points de vigilance
 
@@ -40,3 +41,25 @@
 ## Résultats
 
 Étape 1 close. Grille de taux à deux critères (type de prêt × durée) et formule de mensualité (annuités constantes) validées par l'utilisateur sur ses propres calculs de contrôle, après correction du `ROUNDED`.
+
+Sessions réelles (entrées interactives, `type / capital / durée`), post-fix précision (bug #4) — valeurs vérifiées exactes contre un calcul de référence indépendant (Python) :
+
+```
+Bienvenue dans le simulateur de pret.
+   Veuillez saisir le type de pret :
+      - A pour Pret AUTO 🚘
+      - C pour Pret CONSO 🛍️
+      - I pour Pret IMMO 🏠
+   Veuillez saisir le montant emprunté :
+      (max 999 999.99)
+   Veuillez saisir la durée du pret (années) :
+📈 Le taux annuel est de :  3.45 %
+📈 Le taux mensuel est de : 0.0028750 %
+💰 La mensualité est de   1154.79
+```
+
+| Type         | Capital      | Durée  | Taux   | Mensualité | Valeur exacte (référence) |
+| ------------ | ------------ | ------ | ------ | ---------- | -------------------------- |
+| Immobilier   | 200 000,00 € | 20 ans | 3,45 % | 1 154,79 € | 1 154,79 €                  |
+| Auto         | 25 000,00 €  | 5 ans  | 3,20 % | 451,44 €   | 451,44 €                    |
+| Consommation | 8 000,00 €   | 3 ans  | 5,20 % | 240,49 €   | 240,49 €                    |

@@ -7,11 +7,14 @@
        WORKING-STORAGE SECTION.
       *    Caractéristique du pret    
            COPY 'dempret'.
-      *    Taux Interet Annuel
-       01 WS-TAUX-INTERET   PIC 9(2)V99.
+      *    Taux Interet
+           COPY 'tauxinter' REPLACING TAUX-INTERET BY WS-TAUX-INTERET
+                                         TAUX-ANNUEL BY WS-TAUX-ANNUEL 
+                                       TAUX-MENSUEL BY WS-TAUX-MENSUEL.
        01 WS-MT-MENSUALITE  PIC 9(6)V99.
        LOCAL-STORAGE SECTION. 
-       01 LS-TAUX-INTERET   PIC Z9.99.
+       01 LS-TAUX-ANNUEL    PIC Z9.99.
+       01 LS-TAUX-MENSUEL   PIC 9.9(7).
        01 LS-MT-MENSUALITE  PIC Z(5)9.99.
        PROCEDURE DIVISION.
 
@@ -29,12 +32,14 @@
                                  DUREE-PRET-ANNEE
                                  WS-TAUX-INTERET 
                                  
-           MOVE WS-TAUX-INTERET TO LS-TAUX-INTERET 
-           DISPLAY '📈 Le taux annuel est de : ' LS-TAUX-INTERET ' %'
+           MOVE WS-TAUX-ANNUEL TO LS-TAUX-ANNUEL  
+           DISPLAY '📈 Le taux annuel est de : ' LS-TAUX-ANNUEL ' %'
+           MOVE WS-TAUX-MENSUEL TO LS-TAUX-MENSUEL  
+           DISPLAY '📈 Le taux mensuel est de : ' LS-TAUX-MENSUEL ' %'
 
       *    Calculer la mensualité
            CALL 'CALCMENS' USING CAPITAL
-                                 WS-TAUX-INTERET
+                                 WS-TAUX-MENSUEL
                                  DUREE-PRET-ANNEE
                                  WS-MT-MENSUALITE    
 

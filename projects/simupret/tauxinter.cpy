@@ -1,0 +1,3 @@
+       01 TAUX-INTERET.
+          05 TAUX-ANNUEL   PIC 9(2)V99.
+          05 TAUX-MENSUEL  PIC 9V9(7).
