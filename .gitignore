@@ -31,5 +31,9 @@ projects/inventR/rapport-inventaire.txt
 projects/systpaii/*.dylib
 projects/systpaii/rapport-fp.txt
 projects/systpaii/systpaii
+#simupret
+projects/simupret/*.dylib
+projects/simupret/simupret
 #ZOpenEditor
 zapp.yaml
+
