@@ -2,7 +2,7 @@
 
 Simulateur de prêt bancaire, développé progressivement des notions déjà maîtrisées vers de nouvelles, en vue d'exposer terme un service COBOL via une API REST (wrapper Java, Docker, tests Postman). Correspond au Projet 5 du plan de formation (Semaine 7-8 : Intégrations Modernes, Option A recommandée — COBOL → API REST).
 
-Le projet est découpé en 7 étapes progressives. **Étape 1 (calcul de mensualité) terminée** ; les étapes suivantes (tableau d'amortissement, format d'échange, wrapper Java, exposition HTTP, Docker, Postman) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
+Le projet est découpé en 7 étapes progressives. **Étapes 1 (calcul de mensualité) et 2 (tableau d'amortissement) terminées** ; les étapes suivantes (format d'échange, wrapper Java, exposition HTTP, Docker, Postman) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
 
 ## Étape 1 — Calcul de la mensualité
 
@@ -83,6 +83,47 @@ Autres cas vérifiés (résultats confirmés à ±0,01 € près par un calcul i
 | Auto         | 25 000,00 €  | 5 ans  | 3,20 % | 451,44 €   |
 | Consommation | 8 000,00 €   | 3 ans  | 5,20 % | 240,49 €   |
 
+## Étape 2 — Tableau d'amortissement
+
+Génère l'échéancier complet du prêt : pour chaque mensualité, la répartition entre intérêts et capital remboursé, et le capital restant dû. Spécification complète : [`SFD-etape2.md`](SFD-etape2.md).
+
+### Architecture (ajouts)
+
+| Fichier         | Rôle                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------|
+| `echeance.cpy`  | Copybook — table `ECHEANCIER` à occurrences variables (`OCCURS 1 TO 1200 DEPENDING ON NB-ECHEANCES`), une occurrence par échéance |
+| `geneeche.cob`  | Sous-programme — génère l'échéancier ligne par ligne (intérêts, part de capital, capital restant dû) |
+
+### Exemple d'exécution (cas Auto, 25 000 €, 5 ans)
+
+```
+Capital précédent :  25000.00
+Interet echeance :      66.67
+Capital remboursé :    384.77
+Capital restant :   24615.23
+...
+Capital précédent :     45.04
+Interet echeance :       0.12
+Capital remboursé :     45.02
+Capital restant :        0.13
+```
+
+| Cas | Échéances | Somme intérêts | Somme capital remboursé |
+| --- | --- | --- | --- |
+| Auto (25 000 €, 5 ans) | 60 | 2 086,53 € | 24 999,87 € |
+| Immobilier (200 000 €, 20 ans) | 240 | 77 148,73 € | 200 000,87 € |
+| Consommation (8 000 €, 3 ans) | 36 | 657,49 € | 8 000,15 € |
+
+### Concepts démontrés (Étape 2)
+
+- `OCCURS ... DEPENDING ON` — table à occurrences variables ("pseudo-dynamique" : mémoire allouée pour la borne max, portion logiquement valide pilotée par un compteur), `INDEXED BY` pour l'index de parcours
+- `PERFORM TEST AFTER VARYING ... UNTIL x = borne` — variante post-test qui traite les occurrences 1 à N inclus
+- `COPY ... REPLACING` réutilisé pour un second copybook partagé entre plusieurs sous-programmes
+
+### Limite connue — masquage de signe sur `CAPITAL-RESTANT`
+
+Sur les prêts longs, la dérive d'arrondi cumulée peut aboutir à un léger sur-remboursement (ex: +0,87 € sur 240 échéances). Le résultat mathématique réel de la dernière échéance est alors négatif, mais `CAPITAL-RESTANT` est déclaré `PIC 9(6)V99` (non signé) : COBOL stocke silencieusement la valeur absolue, sans erreur. L'affichage final peut donc laisser croire qu'il reste un solde dû, alors que le client a payé en trop. Non corrigé à cette étape — voir `simupret-project.md` pour le détail du diagnostic.
+
 ## Concepts démontrés (Étape 1)
 
 - Opérateur d'exponentiation `**` dans un `COMPUTE`
@@ -94,4 +135,5 @@ Autres cas vérifiés (résultats confirmés à ±0,01 € près par un calcul i
 ## Limites connues / à venir
 
 - Pas de validation complète des données saisies au-delà d'un contrôle "non nul" — cohérent avec la décision déjà prise sur `systpaii` (validation backloggée pour un futur projet)
-- Pas encore de tableau d'amortissement, de format d'échange structuré, ni d'exposition HTTP — objet des étapes suivantes du Projet 5
+- Masquage de signe sur `CAPITAL-RESTANT` en cas de sur-remboursement (voir Étape 2 ci-dessus) — non corrigé, documenté
+- Pas encore de format d'échange structuré, ni d'exposition HTTP — objet des étapes suivantes du Projet 5

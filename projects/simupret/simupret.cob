@@ -11,8 +11,12 @@
            COPY 'tauxinter' REPLACING TAUX-INTERET BY WS-TAUX-INTERET
                                          TAUX-ANNUEL BY WS-TAUX-ANNUEL 
                                        TAUX-MENSUEL BY WS-TAUX-MENSUEL.
+      *    Tableau des échéances (amortissement)
+           COPY 'echeance'.
+                                                
        01 WS-MT-MENSUALITE  PIC 9(6)V99.
        LOCAL-STORAGE SECTION. 
+       01 LS-NB-MENSUALITE  PIC 9(4).
        01 LS-TAUX-ANNUEL    PIC Z9.99.
        01 LS-TAUX-MENSUEL   PIC 9.9(7).
        01 LS-MT-MENSUALITE  PIC Z(5)9.99.
@@ -27,6 +31,9 @@
       *    Selectonner la durée du pret
            PERFORM SELECT-DUREE-PRET.
 
+      *    Calculer le nombre de mensualités
+           COMPUTE LS-NB-MENSUALITE = DUREE-PRET-ANNEE * 12
+           
       *    Récuperer le taux d'interet 
            CALL 'EVALTAUX' USING TYPE-PRET
                                  DUREE-PRET-ANNEE
@@ -45,6 +52,13 @@
 
            MOVE WS-MT-MENSUALITE TO LS-MT-MENSUALITE 
            DISPLAY "💰 La mensualité est de " LS-MT-MENSUALITE 
+          
+      *    Générer l'échéancier 
+           MOVE LS-NB-MENSUALITE TO NB-ECHEANCES 
+           CALL 'GENEECHE' USING CAPITAL
+                                 WS-MT-MENSUALITE
+                                 WS-TAUX-INTERET
+                                 ECHEANCIER 
       
            GOBACK.
 

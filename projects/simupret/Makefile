@@ -3,14 +3,17 @@ COBM = cobc -m -std=ibm
 SIMUPRET = simupret
 EVALTAUX = evaltaux
 CALCMENS = calcmens
+GENEECHE = geneeche
 
 .PHONY : cleanmodule clean 
 
-$(SIMUPRET) : $(SIMUPRET).cob $(EVALTAUX) $(CALCMENS)
+$(SIMUPRET) : $(SIMUPRET).cob $(EVALTAUX).dylib $(CALCMENS).dylib $(GENEECHE).dylib
 	$(COBC) $<
-$(EVALTAUX) : $(EVALTAUX).cob
+$(EVALTAUX).dylib : $(EVALTAUX).cob
 	$(COBM) $<
-$(CALCMENS) : $(CALCMENS).cob
+$(CALCMENS).dylib : $(CALCMENS).cob
+	$(COBM) $<
+$(GENEECHE).dylib : $(GENEECHE).cob
 	$(COBM) $<
 run : $(SIMUPRET)
 	./$<
