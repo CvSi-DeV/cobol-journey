@@ -60,3 +60,35 @@
 - Piège GnuCOBOL (3.2) constaté : `SEARCH ALL` avec un `WHEN` combinant deux champs par `AND` ne trouve rien même sur données triées ; contournement fiable : une seule clé combinée (`REDEFINES` d'un champ unique) plutôt que deux comparaisons de champs
 - Une variable `FILE STATUS` est écrasée à **chaque** opération fichier (`OPEN`, `READ`, `WRITE`, `REWRITE`...) — pour retenir le statut d'une opération précise (ex: l'`OPEN`) en vue d'une condition plus tard dans une boucle, la copier dans une variable dédiée avant qu'elle ne soit réécrite par l'opération suivante
 - Discipline à renforcer : vérifier `FILE STATUS` après **chaque** instruction fichier qui peut échouer, pas seulement au moment où un plantage devient visible (même bug racine rencontré 3 fois sous des formes différentes sur un seul exercice avant d'être fixé à la source)
+
+## Semaine 5-6 — Projet 4 : Refactoring Production (copybooks, sous-programmes)
+
+- Copybooks (`COPY`) pour partager des structures entre programmes
+- Sous-programmes (`CALL`/`LINKAGE SECTION`), `BY REFERENCE` (défaut) vs `BY CONTENT`
+- `RETURNING` non implémenté par GnuCOBOL pour un `PROGRAM-ID` classique (seulement pour une `FUNCTION-ID`) — tout faire transiter par `USING`
+- Appel statique (`CALL 'X'`) vs dynamique (`CALL X`, nom lu en variable)
+- COBOL ne vérifie aucune correspondance de signature entre appelant et appelé (ni nombre, ni type, ni ordre) — erreurs silencieuses possibles
+- Ordre imposé des sections de la `DATA DIVISION`
+- Niveaux 88 avec `VALUES ... THRU ...` pour des tranches de barème
+- **Piège du "group MOVE"** : `MOVE groupe-A TO groupe-B` est une copie d'octets bruts, pas une conversion champ par champ — casse le formatage `PICTURE` éditée si les deux groupes ne coïncident pas exactement
+- Modules compilés (`cobc -m`) résolus dynamiquement par `libcob` (dossier courant ou `COB_LIBRARY_PATH`)
+
+## Semaine 7-8 — Projet 5 : COBOL vers API REST (simulateur de prêt bancaire)
+
+*Étape 1 — calcul de mensualité*
+- Opérateur d'exponentiation `**`, y compris exposant négatif — piège : un signe négatif appliqué à un champ **non signé** ne se propage pas correctement (contourné en réécrivant la formule sans exposant négatif)
+- `EVALUATE TRUE ALSO TRUE` avec niveaux 88 combinés sur deux champs différents, pour une grille de décision à deux critères
+- `ROUNDED` et le nombre de décimales du `PICTURE` sont deux leviers indépendants — corriger l'un sans l'autre peut ne rien améliorer, voire déplacer l'erreur
+- Makefile : `.PHONY` se déclare avec `:`, pas `=` ; le nom d'une cible Make doit correspondre exactement au fichier physique réellement produit (ex: `nom.dylib`, pas `nom`), sinon recompilation systématique
+
+*Étape 2 — tableau d'amortissement*
+- `OCCURS ... DEPENDING ON` (table à occurrences variables, "pseudo-dynamique") + `INDEXED BY`
+- `PERFORM TEST AFTER VARYING ... UNTIL x = borne` : variante post-test qui traite les occurrences 1 à N inclus
+- Un champ **non signé** recevant un résultat négatif stocke silencieusement sa valeur absolue — piège identique à l'exposant négatif, mais qui fausse ici une donnée métier sans faire planter le calcul
+- Un accumulateur sans valeur initiale explicite (`VALUE ZERO`) peut donner un résultat faux mais **reproductible** — ne jamais compter sur un hypothétique zéro implicite
+
+*Étape 3 — export JSON*
+- `JSON GENERATE`/`JSON PARSE` : conversion automatique groupe COBOL ↔ JSON — mais GnuCOBOL ne gère pas les éléments `OCCURS` dans `JSON GENERATE` (limitation confirmée du projet, pas juste de cette install)
+- `STRING` n'efface jamais le champ récepteur au-delà de ce qu'il écrit ("garbage tail") — `MOVE`, lui, réinitialise tout le champ récepteur à chaque exécution, y compris avec `FUNCTION TRIM` sur lui-même
+- `STRING ... WITH POINTER` : le pointeur ne se réinitialise jamais implicitement entre deux `STRING`
+- `ORGANIZATION SEQUENTIAL` (enregistrements de taille fixe, sans délimiteur) vs `LINE SEQUENTIAL` (délimiteur `\n`, troncature auto des espaces de fin) — le second est adapté au texte, à proscrire pour du binaire
