@@ -4,16 +4,19 @@ SIMUPRET = simupret
 EVALTAUX = evaltaux
 CALCMENS = calcmens
 GENEECHE = geneeche
+GENEJSON = genejson
 
 .PHONY : cleanmodule clean 
 
-$(SIMUPRET) : $(SIMUPRET).cob $(EVALTAUX).dylib $(CALCMENS).dylib $(GENEECHE).dylib
+$(SIMUPRET) : $(SIMUPRET).cob $(EVALTAUX).dylib $(CALCMENS).dylib $(GENEECHE).dylib $(GENEJSON).dylib
 	$(COBC) $<
 $(EVALTAUX).dylib : $(EVALTAUX).cob
 	$(COBM) $<
 $(CALCMENS).dylib : $(CALCMENS).cob
 	$(COBM) $<
 $(GENEECHE).dylib : $(GENEECHE).cob
+	$(COBM) $<
+$(GENEJSON).dylib : $(GENEJSON).cob
 	$(COBM) $<
 run : $(SIMUPRET)
 	./$<

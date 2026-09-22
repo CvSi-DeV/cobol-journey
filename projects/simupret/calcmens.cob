@@ -5,7 +5,7 @@
 
        DATA DIVISION. 
        LOCAL-STORAGE SECTION. 
-       01 LS-NB-MENSUALITE        PIC 9(4).
+       01 LS-NB-MENSUALITE        PIC 9(3).
        01 LS-FACTEUR-CROISSANCE   PIC 9V9(7).
        01 LS-FACT-CROI-DUREE      PIC 9V9(11).
        01 LS-ANNUITE              PIC 9V9(11).

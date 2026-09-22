@@ -34,6 +34,10 @@ projects/systpaii/systpaii
 #simupret
 projects/simupret/*.dylib
 projects/simupret/simupret
+projects/simupret/SIMU-PRET-AUTO.json
+projects/simupret/SIMU-PRET-CONSO.json
+projects/simupret/SIMU-PRET-IMMO.json
 #ZOpenEditor
 zapp.yaml
+
 

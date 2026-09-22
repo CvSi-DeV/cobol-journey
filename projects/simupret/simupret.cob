@@ -16,7 +16,7 @@
                                                 
        01 WS-MT-MENSUALITE  PIC 9(6)V99.
        LOCAL-STORAGE SECTION. 
-       01 LS-NB-MENSUALITE  PIC 9(4).
+       01 LS-NB-MENSUALITE  PIC 9(3).
        01 LS-TAUX-ANNUEL    PIC Z9.99.
        01 LS-TAUX-MENSUEL   PIC 9.9(7).
        01 LS-MT-MENSUALITE  PIC Z(5)9.99.
@@ -59,6 +59,11 @@
                                  WS-MT-MENSUALITE
                                  WS-TAUX-INTERET
                                  ECHEANCIER 
+      *    Générer la sortie JSON
+           CALL 'GENEJSON' USING DEMANDE-PRET
+                                 WS-TAUX-INTERET
+                                 WS-MT-MENSUALITE
+                                 ECHEANCIER 
       
            GOBACK.
 
@@ -80,10 +85,17 @@
            DISPLAY "   Veuillez saisir la durée du pret (années) :"
            MOVE ZEROES TO DUREE-PRET-ANNEE 
            PERFORM TEST AFTER UNTIL DUREE-PRET-ANNEE NOT = 0
+              AND DUREE-PRET-ANNEE NOT > 25
                    ACCEPT DUREE-PRET-ANNEE
+                   
                    IF DUREE-PRET-ANNEE = 0 THEN 
                       DISPLAY "Saisie invalide ❌"
-                   END-IF  
+                   END-IF
+                   
+                   IF DUREE-PRET-ANNEE > 25 THEN 
+                      DISPLAY 
+                      "La durée du prêt est limitée à 25 ans ❌"
+                   END-IF 
            END-PERFORM
            .
        SELECT-CAPITAL.

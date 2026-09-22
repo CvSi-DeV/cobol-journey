@@ -2,7 +2,7 @@
 
 Simulateur de prêt bancaire, développé progressivement des notions déjà maîtrisées vers de nouvelles, en vue d'exposer terme un service COBOL via une API REST (wrapper Java, Docker, tests Postman). Correspond au Projet 5 du plan de formation (Semaine 7-8 : Intégrations Modernes, Option A recommandée — COBOL → API REST).
 
-Le projet est découpé en 7 étapes progressives. **Étapes 1 (calcul de mensualité) et 2 (tableau d'amortissement) terminées** ; les étapes suivantes (format d'échange, wrapper Java, exposition HTTP, Docker, Postman) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
+Le projet est découpé en 7 étapes progressives. **Étapes 1 (calcul de mensualité), 2 (tableau d'amortissement) et 3 (export JSON) terminées** ; les étapes suivantes (wrapper Java, exposition HTTP, Docker, Postman) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
 
 ## Étape 1 — Calcul de la mensualité
 
@@ -120,9 +120,58 @@ Capital restant :        0.13
 - `PERFORM TEST AFTER VARYING ... UNTIL x = borne` — variante post-test qui traite les occurrences 1 à N inclus
 - `COPY ... REPLACING` réutilisé pour un second copybook partagé entre plusieurs sous-programmes
 
-### Limite connue — masquage de signe sur `CAPITAL-RESTANT`
+### Limite connue à l'Étape 2 — masquage de signe sur `CAPITAL-RESTANT`
 
-Sur les prêts longs, la dérive d'arrondi cumulée peut aboutir à un léger sur-remboursement (ex: +0,87 € sur 240 échéances). Le résultat mathématique réel de la dernière échéance est alors négatif, mais `CAPITAL-RESTANT` est déclaré `PIC 9(6)V99` (non signé) : COBOL stocke silencieusement la valeur absolue, sans erreur. L'affichage final peut donc laisser croire qu'il reste un solde dû, alors que le client a payé en trop. Non corrigé à cette étape — voir `simupret-project.md` pour le détail du diagnostic.
+Sur les prêts longs, la dérive d'arrondi cumulée peut aboutir à un léger sur-remboursement (ex: +0,87 € sur 240 échéances). Le résultat mathématique réel de la dernière échéance est alors négatif, mais `CAPITAL-RESTANT` était déclaré `PIC 9(6)V99` (non signé) : COBOL stockait silencieusement la valeur absolue, sans erreur. **Corrigé à l'Étape 3** (voir ci-dessous).
+
+## Étape 3 — Export JSON
+
+Assemble un document JSON unique (demande + taux + mensualité + échéancier) exploitable par un programme externe — préparation directe du wrapper Java de l'Étape 4. Spécification complète : [`SFD-etape3.md`](SFD-etape3.md).
+
+### Architecture (ajouts)
+
+| Fichier         | Rôle                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------|
+| `genejson.cob`  | Sous-programme — génère le JSON complet (`JSON GENERATE` pour demande/taux/mensualité, construction manuelle via `STRING` pour l'échéancier) et l'écrit dans un fichier `LINE SEQUENTIAL` |
+
+### Correction — signe de `CAPITAL-RESTANT`
+
+`CAPITAL-RESTANT` (dans `echeance.cpy`) passé en `PIC S9(6)V99` (champ signé), conformément à l'exigence de la SFD. Revérifié sur les 3 cas de test : le signe négatif apparaît désormais correctement en cas de sur-remboursement.
+
+### Limite GnuCOBOL confirmée — `JSON GENERATE` et `OCCURS`
+
+GnuCOBOL ne supporte pas les éléments `OCCURS` dans `JSON GENERATE` (warning `[-Wpending]` à la compilation ; seule la première occurrence serait exportée, silencieusement) — limitation connue et non résolue du projet GnuCOBOL, confirmée par test isolé et par la documentation communautaire. Contournée en générant le tableau d'échéances manuellement (boucle + `STRING`), tout en gardant `JSON GENERATE` pour les parties sans tableau.
+
+### Exemple de sortie (extrait, cas Immobilier)
+
+```json
+{
+  "DEMANDE-PRET": { "TYPE-PRET": "I", "CAPITAL": 200000.0, "DUREE-PRET-ANNEE": 20 },
+  "TAUX-INTERET": { "TAUX-ANNUEL": 3.45, "TAUX-MENSUEL": 0.002875 },
+  "MENSUALITE": 1154.79,
+  "ECHEANCIER": {
+    "NB-ECHEANCES": 240,
+    "ECHEANCES": [
+      { "NUM-ECHEANCE": 1, "CAPITAL-PREC": 200000.0, "INTERET-ECHEANCE": 575.0, "CAPITAL-REMBOURSE": 579.79, "CAPITAL-RESTANT": 199420.21 },
+      ...
+      { "NUM-ECHEANCE": 240, "CAPITAL-PREC": 1150.61, "INTERET-ECHEANCE": 3.31, "CAPITAL-REMBOURSE": 1151.48, "CAPITAL-RESTANT": -0.87 }
+    ]
+  }
+}
+```
+
+| Cas | `NB-ECHEANCES` | Mensualité | `CAPITAL-RESTANT` dernière échéance |
+| --- | --- | --- | --- |
+| Auto (25 000 €, 5 ans) | 60 | 451,44 € | +0,13 € |
+| Consommation (8 000 €, 3 ans) | 36 | 240,49 € | -0,15 € (signe corrigé) |
+| Immobilier (200 000 €, 20 ans) | 240 | 1 154,79 € | -0,87 € (signe corrigé) |
+
+### Concepts démontrés (Étape 3)
+
+- `JSON GENERATE` (et sa limite réelle avec `OCCURS`, confirmée par test)
+- `STRING` ne réinitialise jamais le champ récepteur au-delà de ce qu'il écrit (le "garbage tail"), contrairement à `MOVE` qui réinitialise tout le champ — exploité via `MOVE FUNCTION TRIM(champ) TO champ` pour recompacter un champ sans effet de bord
+- `STRING ... WITH POINTER` : le pointeur ne se réinitialise jamais implicitement, doit être remis à 1 avant chaque utilisation
+- `ORGANIZATION SEQUENTIAL` vs `LINE SEQUENTIAL` : délimitation des enregistrements, troncature automatique des espaces de fin, adéquation au contenu (texte vs binaire)
 
 ## Concepts démontrés (Étape 1)
 
@@ -135,5 +184,4 @@ Sur les prêts longs, la dérive d'arrondi cumulée peut aboutir à un léger su
 ## Limites connues / à venir
 
 - Pas de validation complète des données saisies au-delà d'un contrôle "non nul" — cohérent avec la décision déjà prise sur `systpaii` (validation backloggée pour un futur projet)
-- Masquage de signe sur `CAPITAL-RESTANT` en cas de sur-remboursement (voir Étape 2 ci-dessus) — non corrigé, documenté
-- Pas encore de format d'échange structuré, ni d'exposition HTTP — objet des étapes suivantes du Projet 5
+- Pas encore de wrapper Java, ni d'exposition HTTP, ni de Docker/Postman — objet des étapes suivantes du Projet 5
