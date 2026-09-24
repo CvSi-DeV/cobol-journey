@@ -2,7 +2,7 @@
 
 Simulateur de prêt bancaire, développé progressivement des notions déjà maîtrisées vers de nouvelles, en vue d'exposer terme un service COBOL via une API REST (wrapper Java, Docker, tests Postman). Correspond au Projet 5 du plan de formation (Semaine 7-8 : Intégrations Modernes, Option A recommandée — COBOL → API REST).
 
-Le projet est découpé en 7 étapes progressives. **Étapes 1 (calcul de mensualité), 2 (tableau d'amortissement) et 3 (export JSON) terminées** ; les étapes suivantes (wrapper Java, exposition HTTP, Docker, Postman) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
+Le projet est découpé en 8 étapes progressives (une 8ᵉ étape dédiée aux tests automatisés Java a été ajoutée en cours de route). **Étapes 1 (calcul de mensualité), 2 (tableau d'amortissement), 3 (export JSON) et 4 (wrapper Java) terminées** ; les étapes suivantes (exposition HTTP, Docker, Postman, tests automatisés) sont à venir. Chaque étape fait l'objet d'une spécification dédiée (`SFD-etapeN.md`).
 
 ## Étape 1 — Calcul de la mensualité
 
@@ -173,6 +173,53 @@ GnuCOBOL ne supporte pas les éléments `OCCURS` dans `JSON GENERATE` (warning `
 - `STRING ... WITH POINTER` : le pointeur ne se réinitialise jamais implicitement, doit être remis à 1 avant chaque utilisation
 - `ORGANIZATION SEQUENTIAL` vs `LINE SEQUENTIAL` : délimitation des enregistrements, troncature automatique des espaces de fin, adéquation au contenu (texte vs binaire)
 
+## Étape 4 — Wrapper Java
+
+Premier programme du projet écrit hors COBOL : un wrapper Java qui lance `simupret` comme processus externe, lui fournit les entrées, récupère le fichier JSON produit et le désérialise en objets Java — pose les bases de l'exposition HTTP de l'Étape 5. Spécification complète : [`SFD-etape4.md`](SFD-etape4.md).
+
+### Architecture (nouveau module)
+
+Nouveau projet Maven `projects/simupret/simupret-wrapper/` (package `nc.cvsi.simupret`) :
+
+| Package/Fichier | Rôle |
+| --- | --- |
+| `wrapper/SimuPretWrapper.java` | Construit et pilote le processus `simupret` (`ProcessBuilder`), écrit les entrées sur son flux standard, attend sa fin, désérialise le JSON produit (Jackson) |
+| `entity/` | `DemandePret`, `TauxInteret`, `Echeance`, `Echeancier` — objets Java miroir de la structure JSON produite par `genejson.cob` (mapping via `@JsonAlias` sur les clés à tirets COBOL) |
+| `exceptions/` | Exceptions dédiées non vérifiées pour la validation de domaine et les échecs de processus/parsing |
+| `App.java` | Point d'entrée : orchestre les 3 cas de test canoniques |
+
+### Configuration
+
+Le chemin vers l'exécutable COBOL est externalisé via variables d'environnement (pas de chemin en dur) :
+
+```bash
+export SIMUPRET_CBL_CWD="/chemin/vers/projects/simupret"
+export SIMUPRET_CBL_EXEC="simupret"
+export SIMUPRET_CBL_JSON="pret.json"
+mvn -o compile exec:java -Dexec.mainClass="nc.cvsi.simupret.App"
+```
+
+### Point de vigilance traité — risque de deadlock
+
+`ProcessBuilder` expose les flux stdin/stdout/stderr du processus enfant ; si son flux de sortie n'est jamais lu par le parent, un tampon système saturé peut bloquer les deux processus mutuellement. Traité via `redirectOutput/Error(Redirect.INHERIT)` (flux de l'enfant directement évacués vers ceux du parent).
+
+### Résultat vérifié (3 cas canoniques, code de retour 0 partout)
+
+| Cas | Mensualité (Java) | `CAPITAL-RESTANT` dernière échéance |
+| --- | --- | --- |
+| Auto (25 000 €, 5 ans) | 451,44 | +0,13 |
+| Consommation (8 000 €, 3 ans) | 240,49 | -0,15 |
+| Immobilier (200 000 €, 20 ans) | 1 154,79 | -0,87 |
+
+Valeurs identiques aux JSON de l'Étape 3 — le signe de `CAPITAL-RESTANT` (le point le plus sensible) est correctement désérialisé en `BigDecimal`.
+
+### Concepts démontrés (Étape 4)
+
+- `ProcessBuilder` : répertoire de travail, flux stdin/stdout/stderr d'un processus externe, `waitFor()`/code de retour
+- Désérialisation JSON → objets Java (Jackson `ObjectMapper`), mapping de clés à tirets vers des champs camelCase (`@JsonAlias`, ou alternative par stratégie de nommage globale `PropertyNamingStrategies.KEBAB_CASE` + `ACCEPT_CASE_INSENSITIVE_PROPERTIES`)
+- `Path.of(cwd, nom)` pour une construction de chemin robuste, indépendante d'une convention de fin de chaîne
+- Exceptions personnalisées non vérifiées pour la validation de domaine et la gestion d'erreurs de processus
+
 ## Concepts démontrés (Étape 1)
 
 - Opérateur d'exponentiation `**` dans un `COMPUTE`
@@ -184,4 +231,4 @@ GnuCOBOL ne supporte pas les éléments `OCCURS` dans `JSON GENERATE` (warning `
 ## Limites connues / à venir
 
 - Pas de validation complète des données saisies au-delà d'un contrôle "non nul" — cohérent avec la décision déjà prise sur `systpaii` (validation backloggée pour un futur projet)
-- Pas encore de wrapper Java, ni d'exposition HTTP, ni de Docker/Postman — objet des étapes suivantes du Projet 5
+- Pas encore d'exposition HTTP, ni de Docker/Postman, ni de tests automatisés côté Java — objet des étapes suivantes du Projet 5
