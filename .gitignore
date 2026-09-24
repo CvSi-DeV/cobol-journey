@@ -37,7 +37,10 @@ projects/simupret/simupret
 projects/simupret/SIMU-PRET-AUTO.json
 projects/simupret/SIMU-PRET-CONSO.json
 projects/simupret/SIMU-PRET-IMMO.json
+projects/simupret/pret.json
+#simupret-wrapper
+projects/simupret/simupret-wrapper/target
 #ZOpenEditor
 zapp.yaml
-
-
+#ignoré, il faut prendre en compte celui de
+.vscode/settings.json
