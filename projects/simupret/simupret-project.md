@@ -23,6 +23,15 @@
 
 - `.PHONY` est une **cible spéciale** de Make, se déclare avec `:` et non `=` — avec `=`, Make crée simplement une variable ordinaire nommée `.PHONY` (les points sont autorisés dans les noms de variable), et les cibles listées ne sont alors pas réellement protégées contre un fichier homonyme.
 
+### Java (Étape 4 — premier contact hors COBOL)
+
+- **`ProcessBuilder`** : lance un programme externe comme sous-processus. Points clés : répertoire de travail (`directory(...)`, important puisque `simupret` écrit `pret.json` relativement à celui-ci), flux stdin/stdout/stderr du processus enfant accessibles depuis le parent, `waitFor()` pour attendre la fin et récupérer le code de retour (équivalent Java du `RETURN-CODE`/`FILE STATUS` déjà pratiqué côté COBOL).
+- **Risque de deadlock** : si le parent ne lit jamais la sortie standard de l'enfant (tampon système de taille limitée), les deux processus peuvent s'attendre mutuellement indéfiniment. Anticipé dès la SFD, traité par `redirectOutput/Error(Redirect.INHERIT)` (les flux de l'enfant sont directement évacués vers ceux du parent).
+- **Jackson (`ObjectMapper`)** : désérialisation JSON → objets Java. `@JsonAlias("TYPE-PRET")` par champ pour mapper un nom JSON différent du nom de champ Java (fonctionne uniquement en désérialisation, pas en écriture). Alternative découverte a posteriori (voir ci-dessous) : une stratégie de nommage globale sur l'`ObjectMapper` (`PropertyNamingStrategies.KEBAB_CASE` + `MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES`) évite d'annoter chaque champ individuellement, à condition que la transformation soit régulière sur toute la structure — vérifié par test, fonctionne sans aucune annotation par champ.
+- Jackson désérialise correctement une valeur JSON string d'un seul caractère (`"I"`) directement vers un `char` Java, et une valeur numérique vers `BigDecimal` — y compris négative (`CAPITAL-RESTANT: -0.87`), sans piège particulier contrairement au signe côté COBOL.
+- `Path.of(cwd, nom)` pour construire un chemin de fichier de façon robuste, plutôt qu'une concaténation de chaînes qui dépend d'un séparateur potentiellement absent.
+- Exceptions personnalisées non vérifiées (`extends RuntimeException`/`IllegalArgumentException`) pour la validation de domaine (type de prêt, capital, durée) — pattern proche des niveaux `88`/`FILE STATUS` côté COBOL dans l'esprit (échouer vite, avec un message explicite), mais matérialisé en classes dédiées plutôt qu'en simple test de condition.
+
 ## Challenge / Objectif
 
 Étape 1 du Projet 5 (Semaine 7-8 du plan, Option A — COBOL → API REST) : calculer la mensualité d'un prêt à taux fixe et annuités constantes, avec un taux d'intérêt déterminé par le programme selon le profil emprunteur (type de prêt × durée), pas saisi directement. Architecture : orchestrateur `simupret.cob` + sous-programmes `evaltaux.cob` (détermination du taux) et `calcmens.cob` (calcul de mensualité), copybook `dempret.cpy`.
@@ -30,6 +39,8 @@
 **Étape 2** : générer l'échéancier complet du prêt (répartition intérêts/capital par mensualité, capital restant dû). Nouveau sous-programme `geneeche.cob`, nouveau copybook `echeance.cpy` (table `ECHEANCIER` à occurrences variables). Refacto associé : le taux (annuel + mensuel) regroupé dans un enregistrement partagé `TAUX-INTERET` (`tauxinter.cpy`), calculé une seule fois dans `evaltaux.cob`.
 
 **Étape 3** : produire un JSON unique et exploitable par un programme externe (demande + taux + mensualité + échéancier), en fichier (`LINE SEQUENTIAL`). Nouveau sous-programme `genejson.cob`. Exigence associée : corriger le masquage de signe sur `CAPITAL-RESTANT` (`echeance.cpy` passé en `PIC S9(6)V99`).
+
+**Étape 4** : premier wrapper hors COBOL — un programme Java (`projects/simupret/simupret-wrapper/`, Maven) qui lance `simupret` via `ProcessBuilder`, lui fournit les 3 entrées programmatiquement, attend sa fin, lit `pret.json` et le désérialise (Jackson) en objets Java. Aucune modification du COBOL existant.
 
 ## Bugs rencontrés (récap)
 
@@ -42,18 +53,27 @@
 7. **`STRING` garbage tail** — un `STRING` n'efface jamais le contenu du champ récepteur au-delà de ce qu'il écrit explicitement. Repéré par l'utilisateur sur un test isolé (`LS-TEST`), diagnostiqué avec l'assistant (mécanisme confirmé par test : reproductible même avec source et cible différentes), et **résolu de façon autonome par l'utilisateur** avec une solution plus élégante que celle suggérée par l'assistant (`WITH POINTER` + `MOVE SPACES` ciblé) : `MOVE FUNCTION TRIM(champ) TO champ`, qui exploite le fait que `MOVE` réinitialise tout le champ récepteur (contrairement à `STRING`).
 8. **`LS-JSON-COUNT` réutilisé comme pointeur `STRING` sans réinitialisation** — variable "fourre-tout" servant à la fois de sortie `COUNT IN` (`JSON GENERATE`), de calcul de longueur (`FINALISE-JSON`) et de pointeur pour le `STRING` d'assemblage final (`WITH POINTER LS-JSON-COUNT`), jamais remise à 1 entre ces usages. Résultat : le `STRING` final démarrait l'écriture à la position laissée par le calcul de longueur de l'échéancier (ex: position 30115 sur le cas Immobilier), tronquant silencieusement l'essentiel du JSON assemblé (`41000 - 30115 = 10885` caractères restants, taille de fichier observée : 10887). **D'abord suspecté à tort comme une limite de `LINE SEQUENTIAL`** — diagnostiqué en traçant les valeurs affichées par le programme lui-même (`DISPLAY 'Longueur : '` déjà présents), confirmé par calcul exact. Même famille que le piège `WITH POINTER` de `geneeche.cob`, mais caché derrière une variable à usages multiples. Corrigé par l'utilisateur (`MOVE 1 TO LS-JSON-COUNT` avant le `STRING` final).
 
+**Étape 4 (Java, revue de code — aucun bug de logique métier, uniquement robustesse/conception)** :
+
+9. `parseJson(File fileToParse, Class<T> jsonDataModel)` ignorait ses propres paramètres génériques — relisait toujours le chemin depuis les variables d'environnement et ciblait toujours `SimuPretWrapperData.class`, quel que soit l'argument fourni. Fonctionnait par coïncidence (l'appelant passait toujours le même fichier), aurait échoué en `ClassCastException` si un jour appelé avec un autre type. Cause reconnue par l'utilisateur : résidu d'un premier jet codé en dur dans `main` avant l'extraction en méthode. Corrigé.
+10. Concaténation de chemin fragile (`CWD + EXEC`, `CWD + JSON`, sans séparateur) — ne fonctionnait que si la variable d'environnement `CWD` se terminait par `/`. Corrigé via `Path.of(cwd, nom)`, revérifié par l'assistant sans slash final — fonctionne quelle que soit la convention de la variable d'environnement.
+11. Gestion d'erreur silencieuse (`catch (IOException...) { System.out.println(...) }`) alors que des exceptions dédiées existaient déjà (`ProcessException`) sans être levées — incohérence entre l'architecture (exceptions personnalisées) et sa mise en œuvre réelle (juste un message consolé). Corrigé : `ProcessException` désormais levée à la fois dans `parseJson` et `startProcess()`.
+12. Stubs `equals`/`hashCode`/`toString` générés par l'IDE et jamais retravaillés (`// TODO Auto-generated method stub` + `return super.equals(obj)`) sur plusieurs classes — code mort. Supprimés.
+
 ## Points de vigilance
 
 - **Précision métier banque/assurance** : l'oubli du `ROUNDED` a été relevé par l'utilisateur lui-même comme un point à sa défaveur dans un contexte bancaire/assurance, où l'arrondi n'est pas cosmétique mais réglementaire. Réflexe à muscler pour la suite du Projet 5 : traiter une contrainte de formatage/arrondi explicitement spécifiée dès l'écriture, pas en retour de revue.
 - `RETURN-CODE` positionné dans `evaltaux.cob` (`WHEN OTHER`) mais jamais exploité côté appelant — essai volontaire de l'utilisateur pour observer le comportement, pas un oubli ; actuellement verrouillé en amont par la validation de saisie (`SELECT-TYPE-PRET`), donc sans impact réel.
 - **Masquage de signe sur `CAPITAL-RESTANT`** (bug #6) : corrigé à l'Étape 3, voir bug #6 mis à jour.
 - **`STRING ... WITH POINTER`** : piège rencontré une seconde fois dans le projet (déjà vu sur `geneeche.cob`), cette fois plus insidieux car caché derrière une variable réutilisée à plusieurs fins (`LS-JSON-COUNT`). Réflexe à muscler : une variable qui sert de pointeur `STRING` ne devrait servir qu'à ça, pas cumuler d'autres usages (compteur, longueur) dans le même passage de code — sans quoi la réinitialisation nécessaire avant chaque `STRING` est facile à oublier.
+- **`new String(x)` sur une chaîne déjà immuable** (Java, Étape 4) — réflexe répété dans plusieurs classes, sans effet néfaste mais sans utilité ; assumé tel quel par l'utilisateur, à perdre progressivement avec la pratique.
 
 ## Temps
 
 - Étape 1 : ~2h53 à 3h30 (11h00 → 16h23, moins 2h30 de pause — écart entre calcul brut et ressenti de l'utilisateur, les deux valeurs sont cohérentes à ~35 min près)
 - Étape 2 : ~1h45 de développement (`geneeche.cob`), hors temps de revue/diagnostic des bugs #5 et #6
 - Étape 3 : ~8h de travail effectif, étalées sur 36h — étape nettement plus dense que les deux précédentes (nouvelle instruction `JSON GENERATE` et sa limite réelle, construction JSON manuelle, deux pièges `STRING` distincts)
+- Étape 4 : ~8h de travail effectif — étude de `ProcessBuilder`, du guide officiel Maven ("Getting Started"), et de l'`ObjectMapper` Jackson, en plus du développement lui-même
 
 ## Confiance
 
@@ -64,6 +84,8 @@
     - *Points positifs* : contournement complet et fonctionnel de la limite `JSON GENERATE`/`OCCURS` (pas une bidouille, un vrai algorithme d'assemblage validé sur 3 tailles d'échéancier) ; autonomie réelle sur le "garbage tail" — rejet argumenté de la suggestion de l'assistant (`WITH POINTER`) au profit d'une solution plus simple et plus juste (`MOVE FUNCTION TRIM`), preuve d'une compréhension personnelle de `MOVE` vs `STRING`, pas d'une application mécanique ; vérification finale rigoureuse des 3 cas, signe inclus sur le cas Immobilier qui avait motivé l'exigence ; discipline de clôture correcte (annoncée seulement une fois réellement terminé, contrairement à l'assistant qui a voulu clore trop tôt sur un seul test).
     - *Point qui retient la note* : le bug `LS-JSON-COUNT`/`WITH POINTER` est une **récidive** du même piège déjà corrigé sur `geneeche.cob` à l'Étape 2 (pointeur non réinitialisé) — réapparu ici car une variable "fourre-tout" (`COUNT IN`, calcul de longueur, pointeur `STRING`) cumulait trois rôles distincts ; principe de conception (une variable-pointeur ne devrait servir qu'à ça) pas encore complètement intégré malgré la leçon déjà tirée une première fois.
     - *Différence avec l'Étape 2* : les deux bugs de cette étape (masquage de signe, garbage tail, pointeur) ont tous été trouvés et corrigés **avant** que l'étape soit déclarée terminée, pas après coup en revue — contrairement à l'Étape 2 où le bug d'initialisation avait été découvert par l'assistant après la clôture annoncée. C'est ce qui explique l'absence de désaccord cette fois : la confiance dans le résultat final n'est pas entamée par un doute sur la méthode de vérification elle-même.
+- Étape 4 : utilisateur 7,5-8/10 — nuancé par la comparaison à un développeur Java plus expérimenté (irait plus vite, n'aurait pas certains réflexes comme `new String(x)`) ; satisfaction affirmée sur l'architecture mise en place et l'absence de blocage pour produire quelque chose de fonctionnel à partir de la seule SFD, dans un langage pourtant peu pratiqué.
+  - **Évaluation assistant : 8/10, sans complaisance** — contrairement aux Étapes 1 à 3, **aucun bug de logique métier** trouvé en revue — les 4 points relevés (paramètres génériques ignorés, chemin fragile, gestion d'erreur incohérente, stubs morts) touchaient tous à la robustesse/conception, jamais au résultat produit, qui était correct dès le premier jet (vérifié par exécution réelle des 3 cas). Méthode de résolution du mapping JSON (`@JsonAlias`) trouvée en comprenant d'abord la cause via le message d'exception, pas par essais-erreurs aveugles — transposition réussie du réflexe de diagnostic déjà acquis côté COBOL vers un langage différent. Les 4 points de revue ont été corrigés en un seul aller-retour, sans qu'aucun n'ait nécessité une deuxième explication. Ce qui retient la note sous 9-10 : ces points de robustesse (paramètre générique jamais utilisé, concaténation de chemin sans séparateur, exception créée mais jamais levée) auraient pu être attrapés par une relecture personnelle avant soumission, indépendamment du niveau d'expérience Java — et le réflexe "chemin portable" n'était pas encore complètement acquis, y compris après une première correction (`launch.json` recontenant un chemin absolu personnel malgré la correction Java déjà faite sur le même sujet).
 
 ## Résultats
 
@@ -118,3 +140,13 @@ Structure JSON (identique sur les 3 cas), un seul document assemblé :
   "ECHEANCIER": { "NB-ECHEANCES": ..., "ECHEANCES": [ {...}, ... ] }
 }
 ```
+
+Étape 4 close. Wrapper Java (`simupret-wrapper`, Maven) exécuté et vérifié par l'assistant (pas seulement lu) sur les 3 cas canoniques — compilation + exécution réelle avec les variables d'environnement (`SIMUPRET_CBL_CWD`/`SIMUPRET_CBL_EXEC`/`SIMUPRET_CBL_JSON`) :
+
+| Cas | Code retour | Mensualité (Java) | `CAPITAL-RESTANT` dernière échéance (Java, `BigDecimal`) |
+| --- | --- | --- | --- |
+| Auto (25 000 €, 5 ans) | 0 | 451,44 | +0,13 |
+| Consommation (8 000 €, 3 ans) | 0 | 240,49 | -0,15 (signe correctement désérialisé) |
+| Immobilier (200 000 €, 20 ans) | 0 | 1 154,79 | -0,87 (signe correctement désérialisé, cas critique de l'Étape 3) |
+
+Valeurs identiques aux JSON de l'Étape 3 sur les 3 cas — le pipeline Java (`ProcessBuilder` → fichier → Jackson) reproduit fidèlement les données produites par COBOL, y compris le point le plus sensible (le signe).
