@@ -4,7 +4,7 @@
        INPUT-OUTPUT SECTION.
        FILE-CONTROL. 
            SELECT OPTIONAL PRET-JSON 
-           ASSIGN TO "pret.json"
+           ASSIGN USING LK-JSON-FILE-NAME
       *    LINE SEQUENTIAL s'ajuste directement à la taille du contenu
       *    pas d'allocation de tout le buffer dans le fichier     
            ORGANIZATION IS LINE SEQUENTIAL
@@ -45,12 +45,13 @@
            COPY 'tauxinter' REPLACING TAUX-INTERET BY LK-TAUX-INTERET.
            COPY 'echeance' REPLACING ECHEANCIER BY LK-ECHEANCIER.
        01 LK-MT-MENSUALITE            PIC 9(6)V99.
+       01 LK-JSON-FILE-NAME           PIC X(50).
 
        PROCEDURE DIVISION USING LK-DEMANDE-PRET
                                 LK-TAUX-INTERET
                                 LK-MT-MENSUALITE
-                                LK-ECHEANCIER.
-      
+                                LK-ECHEANCIER
+                                LK-JSON-FILE-NAME.
       *    JSON : Caractéristique du pret
            JSON GENERATE WS-JSON-DEM-PRET FROM LK-DEMANDE-PRET
               COUNT IN LS-JSON-COUNT

@@ -5,6 +5,7 @@
        
        DATA DIVISION. 
        WORKING-STORAGE SECTION.
+       01 WS-JSON-FILE-NAME  PIC X(50).
       *    Caractéristique du pret    
            COPY 'dempret'.
       *    Taux Interet
@@ -14,15 +15,17 @@
       *    Tableau des échéances (amortissement)
            COPY 'echeance'.
                                                 
-       01 WS-MT-MENSUALITE  PIC 9(6)V99.
+       01 WS-MT-MENSUALITE   PIC 9(6)V99.
        LOCAL-STORAGE SECTION. 
-       01 LS-NB-MENSUALITE  PIC 9(3).
-       01 LS-TAUX-ANNUEL    PIC Z9.99.
-       01 LS-TAUX-MENSUEL   PIC 9.9(7).
-       01 LS-MT-MENSUALITE  PIC Z(5)9.99.
+       01 LS-NB-MENSUALITE   PIC 9(3).
+       01 LS-TAUX-ANNUEL     PIC Z9.99.
+       01 LS-TAUX-MENSUEL    PIC 9.9(7).
+       01 LS-MT-MENSUALITE   PIC Z(5)9.99.
        PROCEDURE DIVISION.
 
            DISPLAY "Bienvenue dans le simulateur de pret."
+           ACCEPT WS-JSON-FILE-NAME FROM COMMAND-LINE
+      D     DISPLAY "   Paramètre reçu : " WS-JSON-FILE-NAME 
       
       *    Selectionner le type de pret
            PERFORM SELECT-TYPE-PRET.
@@ -63,7 +66,8 @@
            CALL 'GENEJSON' USING DEMANDE-PRET
                                  WS-TAUX-INTERET
                                  WS-MT-MENSUALITE
-                                 ECHEANCIER 
+                                 ECHEANCIER
+                                 WS-JSON-FILE-NAME
       
            GOBACK.
 
