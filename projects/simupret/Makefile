@@ -6,7 +6,7 @@ CALCMENS = calcmens
 GENEECHE = geneeche
 GENEJSON = genejson
 
-.PHONY : cleanmodule clean 
+.PHONY : cleanmodule clean cleanjson
 
 $(SIMUPRET) : $(SIMUPRET).cob $(EVALTAUX).dylib $(CALCMENS).dylib $(GENEECHE).dylib $(GENEJSON).dylib
 	$(COBC) $<
@@ -20,7 +20,9 @@ $(GENEJSON).dylib : $(GENEJSON).cob
 	$(COBM) $<
 run : $(SIMUPRET)
 	./$<
-clean : cleanmodule
+clean : cleanmodule cleanjson
 	rm -f $(SIMUPRET)
 cleanmodule : 
 	rm -f *.dylib
+cleanjson : 
+	rm -f *.json
