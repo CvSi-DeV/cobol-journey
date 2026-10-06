@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import nc.cvsi.simupret.entity.DemandePret;
 import nc.cvsi.simupret.exceptions.ProcessBuilderException;
 import nc.cvsi.simupret.exceptions.ProcessException;
+import nc.cvsi.simupret.exceptions.ProcessInterruptedException;
 
 public class SimuPretWrapper {
     private ProcessBuilder simuProcessBuilder;
@@ -25,13 +26,16 @@ public class SimuPretWrapper {
     }
 
     // Creer le processBuilder
-    public void createProcessBuilder(String pbCommand, File fDirectory) {
+    public void createProcessBuilder(String command, String argument, File fDirectory) {
 
         this.simuProcessBuilder = new ProcessBuilder();
         // mis à jour de la commande
-        if (pbCommand.isEmpty())
+        if (command.isEmpty())
             throw new ProcessBuilderException("La commande du processBuilder est invalide");
-        this.simuProcessBuilder.command(pbCommand);
+        if (command.isEmpty()) {
+            throw new ProcessBuilderException("L'argument du processBuilder est invalide");
+        }
+        this.simuProcessBuilder.command(command, argument);
 
         // mis à jour de CWD du sous-process
         if (fDirectory == null)
@@ -48,9 +52,10 @@ public class SimuPretWrapper {
     }
 
     public int startProcess() {
-        int simuReturnCode = 99;
-        if (this.simuProcessBuilder == null)
+        int simuReturnCode;
+        if (this.simuProcessBuilder == null) {
             throw new NullPointerException("Le process builder est invalide");
+        }
 
         try {
             this.simuProcess = simuProcessBuilder.start();
@@ -58,24 +63,29 @@ public class SimuPretWrapper {
 
             // Alimenter le flux d'entrée du sous-process (stdin) via la sortie du process
             // maître
-            OutputStream simuInputStream = simuProcess.getOutputStream();
-            String simulatedInput = new String(
-                    demandePret.getTypePret() + "\n" + demandePret.getCapital() + "\n" + demandePret.getDuree() + "\n");
-            byte[] simulatedInputBytes = simulatedInput.getBytes();
-            simuInputStream.write(simulatedInputBytes);
-            simuInputStream.flush();
+            try (OutputStream simuInputStream = simuProcess.getOutputStream()) {
+                String simulatedInput = new String(
+                        demandePret.getTypePret() + "\n" + demandePret.getCapital() + "\n" + demandePret.getDuree()
+                                + "\n");
+                byte[] simulatedInputBytes = simulatedInput.getBytes();
+                simuInputStream.write(simulatedInputBytes);
+            }
 
             // Récupérer le code de sortie du sous-process
             simuReturnCode = simuProcess.waitFor();
             System.out.println("SIMUPRET Return Code : " + simuReturnCode);
+            return simuReturnCode;
 
         } catch (IOException ioE) {
-            throw new ProcessException("Le sous-Process est rencontre une problème " + ioE.getMessage());
-
+            throw new ProcessException("Le sous-Process rencontre une problème ", ioE);
         } catch (InterruptedException iE) {
-            throw new ProcessException("Le sous-Process est interrompu " + iE.getMessage());
+            // on détruit l'execution du cobol
+            simuProcess.destroy();
+            // on releve le drapeau pour le thread
+            Thread.currentThread().interrupt();
+            // indiquer que le process est interrompu
+            throw new ProcessInterruptedException("Le sous-Process est interrompu ", iE);
         }
-        return simuReturnCode;
     }
 
     @SuppressWarnings("unchecked")
