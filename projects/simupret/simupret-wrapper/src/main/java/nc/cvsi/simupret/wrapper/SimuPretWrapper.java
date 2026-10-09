@@ -32,7 +32,7 @@ public class SimuPretWrapper {
         // mis à jour de la commande
         if (command.isEmpty())
             throw new ProcessBuilderException("La commande du processBuilder est invalide");
-        if (command.isEmpty()) {
+        if (argument.isEmpty()) {
             throw new ProcessBuilderException("L'argument du processBuilder est invalide");
         }
         this.simuProcessBuilder.command(command, argument);
@@ -73,7 +73,7 @@ public class SimuPretWrapper {
 
             // Récupérer le code de sortie du sous-process
             simuReturnCode = simuProcess.waitFor();
-            System.out.println("SIMUPRET Return Code : " + simuReturnCode);
+            System.out.println("SIMUPRET => Return Code : " + simuReturnCode);
             return simuReturnCode;
 
         } catch (IOException ioE) {

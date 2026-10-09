@@ -32,6 +32,32 @@
 - `Path.of(cwd, nom)` pour construire un chemin de fichier de façon robuste, plutôt qu'une concaténation de chaînes qui dépend d'un séparateur potentiellement absent.
 - Exceptions personnalisées non vérifiées (`extends RuntimeException`/`IllegalArgumentException`) pour la validation de domaine (type de prêt, capital, durée) — pattern proche des niveaux `88`/`FILE STATUS` côté COBOL dans l'esprit (échouer vite, avec un message explicite), mais matérialisé en classes dédiées plutôt qu'en simple test de condition.
 
+### Java (Étape 5 — serveur HTTP et concurrence)
+
+- **`com.sun.net.httpserver.HttpServer`** (natif du JDK, aucune dépendance) : `HttpServer.create(adresse, backlog)` + `.start()`, `createContext(chemin, handler)` associe un chemin à un gestionnaire. `HttpHandler` est une interface fonctionnelle (une seule méthode `handle(HttpExchange)`) — une référence de méthode (`this::handleOK`) suffit comme implémentation, sans classe anonyme.
+- **`HttpExchange`** : méthode HTTP, corps de requête (flux à lire), écriture de la réponse en deux temps (`sendResponseHeaders(code, longueur)` puis écriture des octets dans le flux de sortie).
+- **`ExecutorService`/pool de threads** (`Executors.newFixedThreadPool(2)` + `setExecutor(...)`) : permet à plusieurs requêtes HTTP de s'exécuter réellement en parallèle, plutôt que d'être traitées une par une par défaut.
+- **Jackson en écriture** (`ObjectMapper.writeValueAsString(objet)`) : jusqu'ici utilisé uniquement en lecture (Étape 4) — l'opération inverse, produire du JSON à partir d'un objet Java, avec le même outil.
+- **Portée d'un champ sous concurrence — la vraie leçon de cette étape** : dans une classe dont une méthode est invoquée par plusieurs threads d'un pool (ici `handleSimuPret`, appelée pour chaque requête HTTP), un champ d'**instance** est partagé entre toutes les exécutions concurrentes, alors qu'une variable **locale** à la méthode est propre à chaque appel. Un identifiant censé être unique par requête (nom de fichier généré avec `UUID.randomUUID()`) perd cette garantie d'unicité s'il est stocké dans un champ d'instance plutôt qu'une variable locale — deux threads peuvent se l'écraser mutuellement entre le moment où il est généré et le moment où il est utilisé.
+
+### Bash (Étape 5 — premier contact complet avec le langage)
+
+Tutoriel complet (19 exercices, tous vérifiés en exécution réelle) débouchant sur `verif.sh`, le script de vérification HTTP du projet :
+
+- Shebang, variables et guillemets (simples = littéral, doubles = expansion), `$?` (code retour, écrasé par chaque commande suivante), tests `[ ]`/`[[ ]]` (espaces obligatoires), `&&`/`||`.
+- Fonctions, `local`, et le piège du sous-shell : une fonction appelée via une substitution de commande (`$(...)`) tourne dans un sous-shell — toute variable globale modifiée à l'intérieur ne survit pas en dehors. Un appel direct est nécessaire pour qu'un compteur global (succès/échecs) soit réellement mis à jour.
+- `curl` : `-s`/`-S` (silencieux/erreurs visibles), `-o` (corps de la réponse), `-w '%{http_code}'` (code HTTP, à séparer du corps avec `-o` sous peine de les mélanger), `-X`/`-H`/`-d` pour un `POST` JSON.
+- `jq` : crochets `["clé-a-tiret"]` obligatoires pour une clé contenant un tiret (sinon interprété comme une soustraction), indexation négative `[-1]` pour le dernier élément d'un tableau, `-e` pour transformer une requête en code de sortie vrai/faux.
+- Chemins absolus (partent de la racine du système, `/tmp` n'a aucun rapport avec le dossier du script) vs relatifs (résolus depuis le répertoire de travail courant, pas depuis l'emplacement du fichier script) — `cd "$(dirname "$0")"` pour se positionner de façon prévisible quel que soit l'endroit d'où le script est appelé.
+- Digression `source`/`.` vs exécution (`./script.sh`) : un script sourcé s'exécute dans le shell courant (pas de sous-processus) — un `cd` ou une variable qu'il modifie survit après son exécution, et un `exit` à l'intérieur ferme le terminal lui-même, pas juste le script. `$0` ne change pas si le script est sourcé ; `BASH_SOURCE` est l'alternative fiable dans ce cas.
+- `trap 'commande' EXIT` + `$!` + `kill` : garantir l'arrêt d'un processus lancé en arrière-plan quoi qu'il arrive ensuite (erreur, sortie prématurée, fin normale) — `EXIT` se déclenche dans tous les cas, pas seulement sur un `exit` explicite.
+- `wait pid1 pid2` : attendre la fin de plusieurs processus lancés en parallèle (utilisé pour le test de requêtes HTTP concurrentes).
+
+### Git (Étape 5)
+
+- Une branche par sujet, créée depuis un `main` à jour, mergée par Pull Request, puis supprimée — workflow appris en autonomie après un désordre réel (branches mergées non supprimées, tracking mal configuré sur l'une d'elles).
+- `git branch --merged`, suppression de branches locales/distantes mergées, correction d'un suivi de branche incorrect.
+
 ## Challenge / Objectif
 
 Étape 1 du Projet 5 (Semaine 7-8 du plan, Option A — COBOL → API REST) : calculer la mensualité d'un prêt à taux fixe et annuités constantes, avec un taux d'intérêt déterminé par le programme selon le profil emprunteur (type de prêt × durée), pas saisi directement. Architecture : orchestrateur `simupret.cob` + sous-programmes `evaltaux.cob` (détermination du taux) et `calcmens.cob` (calcul de mensualité), copybook `dempret.cpy`.
@@ -41,6 +67,8 @@
 **Étape 3** : produire un JSON unique et exploitable par un programme externe (demande + taux + mensualité + échéancier), en fichier (`LINE SEQUENTIAL`). Nouveau sous-programme `genejson.cob`. Exigence associée : corriger le masquage de signe sur `CAPITAL-RESTANT` (`echeance.cpy` passé en `PIC S9(6)V99`).
 
 **Étape 4** : premier wrapper hors COBOL — un programme Java (`projects/simupret/simupret-wrapper/`, Maven) qui lance `simupret` via `ProcessBuilder`, lui fournit les 3 entrées programmatiquement, attend sa fin, lit `pret.json` et le désérialise (Jackson) en objets Java. Aucune modification du COBOL existant.
+
+**Étape 5** : exposition de `simupret` en API REST — serveur HTTP Java natif (`com.sun.net.httpserver.HttpServer`) devant le wrapper existant, routes `POST /simupret` et `GET /OK`, nommage de fichier JSON par requête (`UUID`) passé en argument CLI au programme COBOL pour permettre l'exécution concurrente, traitement par un pool de 2 threads. Script bash de vérification (`verif.sh`) couvrant les cas nominaux, les erreurs (400/404/405) et la concurrence réelle (deux requêtes parallèles).
 
 ## Bugs rencontrés (récap)
 
@@ -60,6 +88,13 @@
 11. Gestion d'erreur silencieuse (`catch (IOException...) { System.out.println(...) }`) alors que des exceptions dédiées existaient déjà (`ProcessException`) sans être levées — incohérence entre l'architecture (exceptions personnalisées) et sa mise en œuvre réelle (juste un message consolé). Corrigé : `ProcessException` désormais levée à la fois dans `parseJson` et `startProcess()`.
 12. Stubs `equals`/`hashCode`/`toString` générés par l'IDE et jamais retravaillés (`// TODO Auto-generated method stub` + `return super.equals(obj)`) sur plusieurs classes — code mort. Supprimés.
 
+**Étape 5 (bash et Java)** :
+
+13. **`[ httpCode = 200 ]` sans `$`** (`verif.sh`) — comparaison portant sur la chaîne littérale `httpCode` au lieu de la valeur de la variable, faute du `$` devant le nom. Le test passait silencieusement dans un sens non voulu, sans jamais détecter d'échec réel. Diagnostiqué en traçant la valeur réellement comparée, corrigé par l'utilisateur.
+14. **`curl -w '%{http_code}'` sans `-o /dev/null`** (`verif.sh`) — le corps de la réponse et le code HTTP se retrouvaient concaténés dans la même capture, faussant la comparaison avec `200` (jamais égal à la chaîne obtenue) et provoquant une boucle d'attente du serveur sans condition d'arrêt valide (boucle infinie observée à l'exécution). Corrigé en séparant explicitement le corps (`-o fichier`) du code HTTP (`-w`).
+15. **Bug de concurrence — champs d'instance partagés entre threads (`SimuPretHttpServer.java`)** — `jsonFileName`/`jsonFilePath`, destinés à être uniques par requête (généré via `UUID.randomUUID()`), étaient déclarés comme champs d'**instance** de la classe plutôt que comme variables locales à `handleSimuPret`. Sous le pool de 2 threads, deux requêtes concurrentes pouvaient se partager/écraser ces valeurs entre threads, aboutissant à des réponses contaminées (ex : une requête Immobilier recevant le capital d'une requête Auto traitée en parallèle) ou à des échecs de connexion (« Empty reply from server »). **Un test séquentiel ne pouvait pas révéler ce bug** — seul un test envoyant deux requêtes réellement en parallèle (§3.9 de `verif.sh`) l'a fait apparaître. Diagnostiqué par lecture de code (repérage du champ partagé) puis confirmé empiriquement par l'assistant (5, puis 8 paires de requêtes parallèles montrant la contamination). Corrigé par l'utilisateur en déplaçant ces variables en portée locale de la méthode ; revérifié par l'assistant sur 16 requêtes concurrentes, 0 anomalie.
+16. **Bug de copier-coller dans la validation (`SimuPretWrapper.createProcessBuilder`)** — le paramètre `argument` (nom de fichier JSON unique), ajouté pour supporter la concurrence, est contrôlé par un second `if (command.isEmpty())` au lieu de `if (argument.isEmpty())` — résidu d'un copier-coller de la validation existante sur `command`, non adapté au nouveau paramètre. `argument` vide ne serait donc jamais détecté par cette garde.
+
 ## Points de vigilance
 
 - **Précision métier banque/assurance** : l'oubli du `ROUNDED` a été relevé par l'utilisateur lui-même comme un point à sa défaveur dans un contexte bancaire/assurance, où l'arrondi n'est pas cosmétique mais réglementaire. Réflexe à muscler pour la suite du Projet 5 : traiter une contrainte de formatage/arrondi explicitement spécifiée dès l'écriture, pas en retour de revue.
@@ -67,6 +102,8 @@
 - **Masquage de signe sur `CAPITAL-RESTANT`** (bug #6) : corrigé à l'Étape 3, voir bug #6 mis à jour.
 - **`STRING ... WITH POINTER`** : piège rencontré une seconde fois dans le projet (déjà vu sur `geneeche.cob`), cette fois plus insidieux car caché derrière une variable réutilisée à plusieurs fins (`LS-JSON-COUNT`). Réflexe à muscler : une variable qui sert de pointeur `STRING` ne devrait servir qu'à ça, pas cumuler d'autres usages (compteur, longueur) dans le même passage de code — sans quoi la réinitialisation nécessaire avant chaque `STRING` est facile à oublier.
 - **`new String(x)` sur une chaîne déjà immuable** (Java, Étape 4) — réflexe répété dans plusieurs classes, sans effet néfaste mais sans utilité ; assumé tel quel par l'utilisateur, à perdre progressivement avec la pratique.
+- **Portée d'un champ sous concurrence (bug #15)** : réflexe à muscler pour la suite du projet — dans tout code destiné à être invoqué par plusieurs threads (handler HTTP, tâche planifiée, etc.), vérifier systématiquement qu'une donnée censée être propre à un appel est bien déclarée en variable locale, jamais en champ d'instance, même quand un test séquentiel ne montre aucun problème.
+- **Un test séquentiel ne valide pas du code concurrent** : leçon générale tirée du bug #15 — un plan de test doit être adapté au mode de fonctionnement réel du code (ici, un pool de threads traitant des requêtes en parallèle), pas seulement rejouer les mêmes cas un par un.
 
 ## Temps
 
@@ -74,6 +111,7 @@
 - Étape 2 : ~1h45 de développement (`geneeche.cob`), hors temps de revue/diagnostic des bugs #5 et #6
 - Étape 3 : ~8h de travail effectif, étalées sur 36h — étape nettement plus dense que les deux précédentes (nouvelle instruction `JSON GENERATE` et sa limite réelle, construction JSON manuelle, deux pièges `STRING` distincts)
 - Étape 4 : ~8h de travail effectif — étude de `ProcessBuilder`, du guide officiel Maven ("Getting Started"), et de l'`ObjectMapper` Jackson, en plus du développement lui-même
+- Étape 5 : ~25 à 30h de travail effectif, étalées sur une quinzaine de jours — répartition approximative : ~6h bash (tutoriel complet + `verif.sh`), ~1 à 2h git (nettoyage de branches), le reste en Java (serveur HTTP, diagnostic et correction du bug de concurrence)
 
 ## Confiance
 
@@ -84,6 +122,9 @@
     - *Points positifs* : contournement complet et fonctionnel de la limite `JSON GENERATE`/`OCCURS` (pas une bidouille, un vrai algorithme d'assemblage validé sur 3 tailles d'échéancier) ; autonomie réelle sur le "garbage tail" — rejet argumenté de la suggestion de l'assistant (`WITH POINTER`) au profit d'une solution plus simple et plus juste (`MOVE FUNCTION TRIM`), preuve d'une compréhension personnelle de `MOVE` vs `STRING`, pas d'une application mécanique ; vérification finale rigoureuse des 3 cas, signe inclus sur le cas Immobilier qui avait motivé l'exigence ; discipline de clôture correcte (annoncée seulement une fois réellement terminé, contrairement à l'assistant qui a voulu clore trop tôt sur un seul test).
     - *Point qui retient la note* : le bug `LS-JSON-COUNT`/`WITH POINTER` est une **récidive** du même piège déjà corrigé sur `geneeche.cob` à l'Étape 2 (pointeur non réinitialisé) — réapparu ici car une variable "fourre-tout" (`COUNT IN`, calcul de longueur, pointeur `STRING`) cumulait trois rôles distincts ; principe de conception (une variable-pointeur ne devrait servir qu'à ça) pas encore complètement intégré malgré la leçon déjà tirée une première fois.
     - *Différence avec l'Étape 2* : les deux bugs de cette étape (masquage de signe, garbage tail, pointeur) ont tous été trouvés et corrigés **avant** que l'étape soit déclarée terminée, pas après coup en revue — contrairement à l'Étape 2 où le bug d'initialisation avait été découvert par l'assistant après la clôture annoncée. C'est ce qui explique l'absence de désaccord cette fois : la confiance dans le résultat final n'est pas entamée par un doute sur la méthode de vérification elle-même.
+- Étape 5 : évaluation demandée à l'assistant en premier, argumentée, avant celle de l'utilisateur.
+  - **Évaluation assistant : 7,5/10** — *points positifs* : le bug de concurrence (#15), le plus grave de l'étape, a été localisé par une lecture de code correcte (champ d'instance repéré comme suspect) puis confirmé et corrigé sans tâtonnement une fois le mécanisme compris ; l'architecture retenue (fichier JSON nommé par `UUID` + argument CLI passé au COBOL) est une solution de fond, pas un contournement ; `verif.sh` constitue une démonstration réelle et vérifiée de la concurrence, pas juste une affirmation. *Ce qui retient la note* : sans le test de concurrence explicitement conçu pour ce cas (§3.9), le bug #15 serait resté invisible indéfiniment — la détection vient de la rigueur du plan de test construit avec l'assistant, pas d'un réflexe de conception acquis en amont (les champs d'instance partagés entre threads n'ont pas été évités dès l'écriture) ; le bug #16 (copier-coller de validation) est une négligence simple qu'une relecture ciblée aurait attrapée.
+  - **Évaluation utilisateur : 7/10** — nuancé par la densité et la nouveauté des sujets abordés simultanément (serveur HTTP, concurrence, bash complet) ; remarque générale formulée sur l'apprentissage : une étape qui se termine sans aucune erreur propre laisse une rétention moins forte qu'une étape où des bugs réels ont dû être diagnostiqués et corrigés — nuance distincte de la note elle-même, sur la valeur pédagogique de l'erreur. Score informel additionnel sur le seul volet bash (premier contact complet avec le langage) : 7/10.
 - Étape 4 : utilisateur 7,5-8/10 — nuancé par la comparaison à un développeur Java plus expérimenté (irait plus vite, n'aurait pas certains réflexes comme `new String(x)`) ; satisfaction affirmée sur l'architecture mise en place et l'absence de blocage pour produire quelque chose de fonctionnel à partir de la seule SFD, dans un langage pourtant peu pratiqué.
   - **Évaluation assistant : 8/10, sans complaisance** — contrairement aux Étapes 1 à 3, **aucun bug de logique métier** trouvé en revue — les 4 points relevés (paramètres génériques ignorés, chemin fragile, gestion d'erreur incohérente, stubs morts) touchaient tous à la robustesse/conception, jamais au résultat produit, qui était correct dès le premier jet (vérifié par exécution réelle des 3 cas). Méthode de résolution du mapping JSON (`@JsonAlias`) trouvée en comprenant d'abord la cause via le message d'exception, pas par essais-erreurs aveugles — transposition réussie du réflexe de diagnostic déjà acquis côté COBOL vers un langage différent. Les 4 points de revue ont été corrigés en un seul aller-retour, sans qu'aucun n'ait nécessité une deuxième explication. Ce qui retient la note sous 9-10 : ces points de robustesse (paramètre générique jamais utilisé, concaténation de chemin sans séparateur, exception créée mais jamais levée) auraient pu être attrapés par une relecture personnelle avant soumission, indépendamment du niveau d'expérience Java — et le réflexe "chemin portable" n'était pas encore complètement acquis, y compris après une première correction (`launch.json` recontenant un chemin absolu personnel malgré la correction Java déjà faite sur le même sujet).
 
@@ -106,6 +147,14 @@ Bienvenue dans le simulateur de pret.
 📈 Le taux mensuel est de : 0.0028750 %
 💰 La mensualité est de   1154.79
 ```
+
+**Étape 5 close.** API REST fonctionnelle devant le wrapper Java de l'Étape 4 : serveur `HttpServer` natif, routes `POST /simupret` (traitement d'une demande de prêt) et `GET /OK` (sonde de disponibilité), pool de 2 threads pour un traitement réellement concurrent des requêtes.
+
+Stratégie de concurrence retenue : chaque requête génère un nom de fichier JSON unique (`UUID`), transmis au programme COBOL en argument CLI — élimine toute collision entre requêtes traitées en parallèle, sans modification de la logique métier COBOL elle-même.
+
+`verif.sh` (script bash de vérification, 19 assertions) couvre l'intégralité de la spécification (`SFD-verif-script.md`, §3.1 à §3.10) : disponibilité du serveur, erreurs (requête invalide, méthode non autorisée), les 3 cas métier canoniques (Auto/Immobilier/Consommation) avec vérification de valeur réelle (mensualité, nombre d'échéances, capital restant), et un test de concurrence réelle (deux requêtes `POST` lancées en parallèle, chacune vérifiée pour recevoir sa propre réponse). Résultat final : 19/19 assertions passées, code de sortie 0, aucun fichier temporaire laissé derrière.
+
+Le bug de concurrence (#15) a été détecté et corrigé **avant** la clôture de l'étape, grâce à ce test dédié — confirmation empirique que seul un test conçu pour la concurrence réelle (et non une répétition de tests séquentiels) peut révéler ce type de défaut.
 
 | Type         | Capital      | Durée  | Taux   | Mensualité | Valeur exacte (référence) |
 | ------------ | ------------ | ------ | ------ | ---------- | -------------------------- |

@@ -2,7 +2,7 @@
 
 **Rattaché à :** Étape 5 — Exposition HTTP/REST (voir `SFD-etape5.md`, section 6 "Cas de test attendus")
 **Fichier :** `projects/simupret/verif.sh`
-**Statut :** en cours
+**Statut :** terminé
 
 ## 1. Objectif
 
@@ -10,7 +10,7 @@ Un script `bash` autonome qui démarre le serveur HTTP (`simupret-wrapper`), vé
 
 ## 2. Configuration nécessaire avant de démarrer le serveur
 
-Le serveur Java (`App.java`) lit ses paramètres dans les variables d'environnement `SIMUPRET_SERVER_PORT`, `SIMUPRET_CBL_CWD`, `SIMUPRET_CBL_EXEC`, `SIMUPRET_CBL_JSON` — le script doit les définir et les exporter avant de lancer Maven.
+Le serveur Java (`App.java`) lit ses paramètres dans les variables d'environnement `SIMUPRET_SERVER_PORT`, `SIMUPRET_CBL_CWD`, `SIMUPRET_CBL_EXEC` — le script doit les définir et les exporter avant de lancer Maven.
 
 **Indice** : `export VAR=valeur`. Sois attentif à la valeur de `SIMUPRET_CBL_CWD` : elle doit être cohérente avec le dossier **depuis lequel Maven sera réellement lancé** — rappelle-toi ce qu'on avait découvert sur `ProcessBuilder` et la résolution des chemins relatifs à l'Étape 4 (le piège `../simupret` vs `./simupret`). `verif.sh` vit dans `projects/simupret/`, pas dans `simupret-wrapper/` — le chemin ne sera donc pas forcément le même que celui que tu utilisais dans `test.sh`.
 

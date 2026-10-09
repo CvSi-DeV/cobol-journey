@@ -39,18 +39,8 @@ public class SimuPretHttpServer {
     private static final String SIMUPRET_ROUTE = "/simupret";
     private static final Set<String> ALLOWED_METHODS = Set.of("POST");
 
-    private static final Path simuPretCWD = Path.of(System.getenv("SIMUPRET_CBL_CWD"));
-    private static final Path simuPretExec = Path.of(System.getenv("SIMUPRET_CBL_EXEC"));
-    private static final Path simuPretJSON = Path.of(System.getenv("SIMUPRET_CBL_CWD"),
-            System.getenv("SIMUPRET_CBL_JSON"));
-
     private final InetSocketAddress socketAddress;
     private final SimuPretConfig spg;
-
-    // Nom du fichier json
-    String jsonFileName;
-    // Path du fichier json
-    Path jsonFilePath;
 
     // Step 1: Create an HttpServer instance.
     // Step 2: Create a context and set the handler.
@@ -98,13 +88,22 @@ public class SimuPretHttpServer {
     private void handleSimuPret(HttpExchange exchange) throws IOException {
         String methodRecue = exchange.getRequestMethod();
         String cheminRecu = exchange.getRequestURI().getPath();
-        System.out.println(methodRecue);
-        System.out.println("URI = " + exchange.getRequestURI().toString());
-        System.out.println("Path = " + cheminRecu);
+
+        // Nom du fichier json
+        String jsonFileName;
+        // Path du fichier json
+        Path jsonFilePath;
+
         ObjectMapper ob = new ObjectMapper();
         DemandePret demandePret;
         SimuPretWrapper simuPret;
         String simuPretJsonResponseBody;
+
+        // creation du nom de fichier Json
+        jsonFileName = "simu-" + UUID.randomUUID() + ".json";
+        System.out.println("Le nom du fichier JSON : " + jsonFileName);
+        jsonFilePath = spg.currentWorkDirectory().resolve(jsonFileName);
+        System.out.println("Le path du fichier JSON : " + jsonFilePath);
 
         try {
             // Vérifier la route
@@ -126,7 +125,6 @@ public class SimuPretHttpServer {
             // Extraire les paramètres d'appel en fonction de la méthode
             try (InputStream is = exchange.getRequestBody()) {
                 demandePret = ob.readValue(is, DemandePret.class);
-                System.out.println("POST REQUEST BODY : " + demandePret);
             } catch (InvalidDefinitionException ide) {
                 sendJsonResponse(exchange, 500, jsonError("Erreur interne"));
                 return;
@@ -160,22 +158,18 @@ public class SimuPretHttpServer {
             // APPEL DU PROCESS BUILDER
             int returnCode;
             try {
-                // creation du nom de fichier Json
-                jsonFileName = "simu-" + UUID.randomUUID() + ".json";
-                System.out.println("Le nom du fichier JSON : " + jsonFileName);
-                jsonFilePath = simuPretCWD.resolve(jsonFileName);
-
                 // Exécution de la demande de pret
+                System.out.println("demande de pret " + demandePret);
                 simuPret = new SimuPretWrapper(demandePret);
-                simuPret.createProcessBuilder(simuPretExec.toString(), jsonFileName, simuPretCWD.toFile());
+
+                simuPret.createProcessBuilder(spg.exec().toString(), jsonFileName, spg.currentWorkDirectory().toFile());
                 Instant startInstant = Instant.now();
                 returnCode = simuPret.startProcess();
                 Instant stopInstant = Instant.now();
                 Duration dureeExex = Duration.between(startInstant, stopInstant);
 
-                System.out.println("Durée Cobol : " + dureeExex + "sec?");
-                System.out.println("Durée Cobol : " + dureeExex.toMillis());
-                System.out.println("Return code SIMUPRET : " + returnCode);
+                System.out.println("Durée Cobol : " + dureeExex + " sec");
+                System.out.println("Durée Cobol : " + dureeExex.toMillis() + " ms");
             } catch (ProcessInterruptedException pie) {
                 // ProcessInterruptedException doit arriver avant tout ProcessException sinon
                 // intercepté par ce dernier (Heritage)
@@ -211,19 +205,18 @@ public class SimuPretHttpServer {
                 return;
             }
 
-            // on supprime le fichier de la simulation
-            try {
-                Files.deleteIfExists(jsonFilePath);
-
-            } catch (SecurityException | IOException e) {
-                System.err.println("Impossible de supprimer le fichier : " + jsonFileName + " => " + e);
-            }
-
             // Créer la réponse 200-OK
             sendJsonResponse(exchange, 200, simuPretJsonResponseBody);
 
         } finally {
             exchange.close();
+
+            // on supprime le fichier de la simulation
+            try {
+                Files.deleteIfExists(jsonFilePath);
+            } catch (SecurityException | IOException e) {
+                System.err.println("Impossible de supprimer le fichier : " + jsonFileName + " => " + e);
+            }
         }
     }
 

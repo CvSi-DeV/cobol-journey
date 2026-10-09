@@ -43,5 +43,6 @@ projects/simupret/pret.json
 projects/simupret/simupret-wrapper/target
 #ZOpenEditor
 zapp.yaml
-#ignoré, il faut prendre en compte celui de
+#ignoré, il faut prendre en compte celui de /simupret-wrapper
 .vscode/settings.json
+.vscode/launch.json

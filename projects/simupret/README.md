@@ -83,6 +83,14 @@ Autres cas vérifiés (résultats confirmés à ±0,01 € près par un calcul i
 | Auto         | 25 000,00 €  | 5 ans  | 3,20 % | 451,44 €   |
 | Consommation | 8 000,00 €   | 3 ans  | 5,20 % | 240,49 €   |
 
+### Concepts démontrés (Étape 1)
+
+- Opérateur d'exponentiation `**` dans un `COMPUTE`
+- `EVALUATE TRUE ALSO TRUE` avec niveaux 88 combinés sur deux champs distincts, pour une grille de décision à deux critères
+- Sous-programmes (`CALL`/`LINKAGE SECTION`), copybook de structure de données partagée, `COPY ... REPLACING` pour adapter les noms de champs au préfixe de chaque programme
+- `ROUNDED` sur un `COMPUTE` final pour un résultat monétaire — précision réglementaire en contexte bancaire/assurance
+- `ROUNDED` et nombre de décimales du `PICTURE` sont deux leviers indépendants : un taux mensuel stocké avec trop peu de décimales (`PIC 9V9(5)`) reste imprécis même arrondi, et l'erreur s'amplifie avec l'exponentiation sur un prêt long — corrigé en élargissant le `PICTURE` (`9V9(7)`), pas seulement en ajoutant `ROUNDED`
+
 ## Étape 2 — Tableau d'amortissement
 
 Génère l'échéancier complet du prêt : pour chaque mensualité, la répartition entre intérêts et capital remboursé, et le capital restant dû. Spécification complète : [`SFD-etape2.md`](SFD-etape2.md).
@@ -220,15 +228,79 @@ Valeurs identiques aux JSON de l'Étape 3 — le signe de `CAPITAL-RESTANT` (le 
 - `Path.of(cwd, nom)` pour une construction de chemin robuste, indépendante d'une convention de fin de chaîne
 - Exceptions personnalisées non vérifiées pour la validation de domaine et la gestion d'erreurs de processus
 
-## Concepts démontrés (Étape 1)
+## Étape 5 — Exposition HTTP/REST
 
-- Opérateur d'exponentiation `**` dans un `COMPUTE`
-- `EVALUATE TRUE ALSO TRUE` avec niveaux 88 combinés sur deux champs distincts, pour une grille de décision à deux critères
-- Sous-programmes (`CALL`/`LINKAGE SECTION`), copybook de structure de données partagée, `COPY ... REPLACING` pour adapter les noms de champs au préfixe de chaque programme
-- `ROUNDED` sur un `COMPUTE` final pour un résultat monétaire — précision réglementaire en contexte bancaire/assurance
-- `ROUNDED` et nombre de décimales du `PICTURE` sont deux leviers indépendants : un taux mensuel stocké avec trop peu de décimales (`PIC 9V9(5)`) reste imprécis même arrondi, et l'erreur s'amplifie avec l'exponentiation sur un prêt long — corrigé en élargissant le `PICTURE` (`9V9(7)`), pas seulement en ajoutant `ROUNDED`
+Le wrapper Java de l'Étape 4 est exposé en API REST : un serveur HTTP natif (`com.sun.net.httpserver.HttpServer`, aucune dépendance supplémentaire) devant la logique existante, capable de traiter plusieurs requêtes réellement en parallèle. Spécifications complètes : [`SFD-etape5.md`](SFD-etape5.md) et [`SFD-verif-script.md`](SFD-verif-script.md).
+
+### Architecture (ajouts)
+
+| Package/Fichier | Rôle |
+| --- | --- |
+| `httpserver/SimuPretHttpServer.java` | Démarre `HttpServer`, déclare les routes (`createContext`), pool de threads (`ExecutorService`, 2 threads), génère un nom de fichier JSON unique par requête (`UUID`) et le transmet au COBOL en argument CLI |
+| `wrapper/SimuPretWrapper.java` | `createProcessBuilder` accepte désormais un argument supplémentaire (le nom de fichier JSON unique de la requête courante), propagé au processus `simupret` |
+| `App.java` | Démarre le serveur HTTP au lieu d'exécuter les 3 cas de test directement |
+
+Routes exposées :
+
+| Méthode | Route | Rôle |
+| --- | --- | --- |
+| `GET` | `/OK` | Sonde de disponibilité |
+| `POST` | `/simupret` | Simuler un prêt (`typePret`/`capital`/`duree` en JSON) |
+
+### Stratégie de concurrence
+
+Chaque requête génère son propre nom de fichier JSON (`"simu-" + UUID.randomUUID() + ".json"`), transmis en argument au programme COBOL — élimine toute collision entre deux requêtes traitées simultanément par le pool de threads, sans modification de la logique métier COBOL.
+
+### Exemple d'exécution
+
+```
+POST /simupret
+Content-Type: application/json
+
+{"typePret":"A","capital":25000.00,"duree":5}
+```
+
+Réponse (200), exemple réel capturé :
+
+```json
+{
+  "demandePret": { "typePret": "A", "capital": 25000.00, "duree": 5 },
+  "tauxInteret": { "tauxAnnuel": 3.20, "tauxMensuel": 0.0026666 },
+  "mensualite": 451.44,
+  "echeancier": {
+    "nbEcheances": 60,
+    "echeances": [
+      { "numEcheance": 1, "capitalPrecedent": 25000, "interetEcheance": 66.67, "capitalRembourse": 384.77, "capitalRestant": 24615.23 },
+      { "numEcheance": 60, "capitalPrecedent": 450.37, "interetEcheance": 1.2, "capitalRembourse": 450.24, "capitalRestant": 0.13 }
+    ]
+  }
+}
+```
+
+Erreurs : 400 (requête invalide), 404 (route inconnue), 405 (méthode non autorisée), 500/503 (échec côté serveur/COBOL).
+
+### Compilation & exécution
+
+```bash
+export SIMUPRET_SERVER_PORT="8080"
+export SIMUPRET_CBL_CWD="/chemin/vers/projects/simupret"
+export SIMUPRET_CBL_EXEC="simupret"
+mvn -o compile exec:java -Dexec.mainClass="nc.cvsi.simupret.App"
+```
+
+Vérification complète (démarrage du serveur, 3 cas canoniques, erreurs, concurrence réelle) : `./verif.sh`.
+
+### Concepts démontrés (Étape 5)
+
+- `HttpServer`/`HttpExchange`/`HttpHandler` (interface fonctionnelle, implémentable par référence de méthode)
+- Pool de threads (`ExecutorService`) pour un traitement HTTP réellement concurrent
+- Portée d'un champ sous concurrence : une donnée propre à une requête doit être une variable locale, jamais un champ d'instance partagé entre threads — bug rencontré et corrigé sur ce point précis (voir le suivi détaillé du projet)
+- `ObjectMapper.writeValueAsString()` (sérialisation Jackson, complémentaire de la désérialisation déjà vue à l'Étape 4)
+- Script bash de vérification bout-en-bout (`curl`/`jq`/`trap`/`wait`), incluant un test de concurrence réelle (requêtes parallèles)
 
 ## Limites connues / à venir
 
 - Pas de validation complète des données saisies au-delà d'un contrôle "non nul" — cohérent avec la décision déjà prise sur `systpaii` (validation backloggée pour un futur projet)
-- Pas encore d'exposition HTTP, ni de Docker/Postman, ni de tests automatisés côté Java — objet des étapes suivantes du Projet 5
+- Pas de CORS, pas d'authentification, pas de HTTPS — API en l'état non destinée à être exposée au-delà d'un usage local/démo
+- Concurrence limitée à 2 requêtes simultanées (taille du pool de threads)
+- Pas encore de Docker, ni de Postman, ni de tests automatisés côté Java — objet des étapes suivantes du Projet 5
