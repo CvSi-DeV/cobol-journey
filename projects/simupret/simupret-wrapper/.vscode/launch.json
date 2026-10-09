@@ -13,7 +13,7 @@
             "env": {
                 "SIMUPRET_CBL_CWD": "..",
                 "SIMUPRET_CBL_EXEC": "./simupret",
-                "SIMUPRET_CBL_JSON": "pret.json"
+                "SIMUPRET_SERVER_PORT":"8765"
             }
         }
     ]

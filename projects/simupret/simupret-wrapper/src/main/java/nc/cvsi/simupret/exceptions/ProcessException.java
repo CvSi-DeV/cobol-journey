@@ -5,4 +5,8 @@ public class ProcessException extends RuntimeException {
         super(pException);
     }
 
+    public ProcessException(String pException, Throwable cause) {
+        super(pException, cause);
+    }
+
 }

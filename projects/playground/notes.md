@@ -87,3 +87,24 @@ Pas un projet numéroté du plan (`.plan/plan.md`) — pas de template de suivi 
     - Bug réel trouvé et corrigé : `PRODUCT-MOD` rouvrait le fichier (`OPEN I-O`) à **chaque itération** d'une boucle de ressaisie — sur GnuCOBOL ça n'a pas cassé visiblement (testé avec une saisie invalide suivie d'une valide), mais rouvrir un fichier déjà ouvert est un statut d'erreur en COBOL standard (`FILE STATUS "41"`) non garanti portable. Cause : faute d'inattention selon l'utilisateur. Corrigé en déplaçant l'`OPEN` avant la boucle (aligné sur le modèle déjà correct de `PRODUCT-DEL`), protégé par `IF FS-OK`. Même famille de point de vigilance que sur `navalbat` (`FILE STATUS` non vérifié systématiquement) — ici la correction a été immédiate et bien comprise, signe que le réflexe s'installe.
     - Bonus non demandés, ajoutés spontanément après la revue : renommage `FS-FILE-MISSING` → `FS-FILE-CREATED` (plus fidèle au sens du code `"05"`, qui signifie que le fichier vient d'être créé, pas qu'il manque) ; `88 FS-END-OF-FILE VALUE "10"` introduit et réutilisé dans `READ-AND-DISPLAY` à la place d'un `PERFORM UNTIL 1 = 2` (boucle infinie déguisée) — cohérent avec l'idiome déjà utilisé dans `creneaux.cob` (`CST-FS-EOF`).
     - Tout testé en exécution réelle (pas que lecture de code), y compris le chemin d'erreur (saisie d'un code produit invalide sur `PRODUCT-MOD`).
+
+- 2026-10-08 : bash et script sh : Objectifs tester rapidement l'étape 5 du projet simupret
+  - /scripts :
+    - déclaration du shell au début du script
+    - variables et guillemets
+    - code retours et conditions
+    - fonctions
+    - curl et POST JSON
+    - redirection et pipes
+    - outil jq
+    - démarrer et attendre une commande
+    - compter les OK et KO
+    - chemins absolus vs relatifs, se positionner dans le dossier du script quel que soit l'endroit d'où il est appelé (`$0`, `dirname`, `cd`)
+    - digression : `source`/`.` vs exécution d'un script (`./script.sh`) — un script sourcé s'exécute dans le shell courant, pas dans un sous-processus séparé ; conséquences : un `cd` ou une variable définie dans un script sourcé survit après son exécution, et un `exit` dans un script sourcé ferme le terminal lui-même (pas juste le script) ; `$0` ne change pas si le script est sourcé, `BASH_SOURCE` est l'alternative fiable dans ce cas
+    - piège du sous-shell : une fonction appelée via une substitution de commande (`resultat=$(ma_fonction ...)`) tourne dans un sous-shell — toute variable globale modifiée à l'intérieur ne survit pas en dehors ; un appel direct (`ma_fonction ...`, sans `$(...)`) est nécessaire pour qu'un compteur global (succès/échecs) soit réellement mis à jour
+    - `trap 'commande' EXIT` + `$!` + `kill` : garantir l'arrêt d'un processus lancé en arrière-plan (le serveur HTTP) quoi qu'il arrive ensuite dans le script, y compris en cas d'erreur ou de sortie prématurée — `EXIT` se déclenche aussi bien sur un `exit` explicite que sur la simple fin naturelle du script
+    - `jq` : crochets `["clé-a-tiret"]` obligatoires pour accéder à une clé contenant un tiret (sinon interprété comme une soustraction), indexation négative `[-1]` pour le dernier élément d'un tableau, `-e` pour transformer le résultat d'une requête en code de sortie vrai/faux exploitable dans un `if`
+    - éviter `/tmp` (partagé au niveau du système, comportement moins prévisible qu'attendu) au profit d'un dossier de travail dédié dans le projet, créé avec `mkdir -p`
+    - `wait pid1 pid2` pour attendre la fin de plusieurs processus lancés en parallèle (test de requêtes HTTP concurrentes)
+  - Bugs réels rencontrés et corrigés dans `verif.sh` : condition `[ httpCode = 200 ]` écrite sans `$` (comparaison de chaînes littérales, toujours fausse, jamais détectée par bash comme une erreur de syntaxe) ; `curl -w '%{http_code}'` utilisé sans `-o /dev/null`, mélangeant le corps de la réponse et le code HTTP dans la même variable ; boucle d'attente du serveur sans limite d'essais (`while true` sans compteur) — les trois combinés ont produit une vraie boucle infinie, observée et arrêtée manuellement avant correction.
+  - **Bug Java découvert grâce au test de concurrence du script** (hors scope bash, mais trouvé par ce biais) : `SimuPretHttpServer` utilisait des champs d'instance (`jsonFileName`/`jsonFilePath`) partagés entre les threads du pool HTTP — deux requêtes concurrentes pouvaient se voir mélanger leurs données (vérifié : une requête Immobilier a reçu les données d'une requête Auto). Corrigé en ramenant ces variables au niveau local du handler (une instance par thread/requête, plus de partage). Détail complet dans `projects/simupret/simupret-project.md`.
