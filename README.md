@@ -2,17 +2,16 @@
 
 ![License](https://img.shields.io/github/license/CvSi-DeV/cobol-journey)
 
-_**Expert legacy COBOL spécialisé intégration moderne.
-Expérience Z/OS, IBM i, Java.
-Je lis le COBOL legacy, je l'optimise, et je le branche aux APIs modernes**_
+_**Concepteur Développeur Mainframe z/OS & IBM i — 12 ans sur des SI critiques (PL/I, Adelia).
+Ce dépôt documente ma pratique de COBOL et sa connexion aux architectures modernes (API REST, Java).**_
 
 ## A propos
 
-Je travaille sur les environnements IBM (Mainframe, IBMi) depuis près de 15 ans. Dans ce parcours, j'ai rencontré divers systèmes critiques et exigeants me forçant à m'adapter.
+Je travaille depuis 12 ans sur des environnements IBM : 3 ans et demi sur z/OS (PL/I, JCL, DB2, CICS) et près de 9 ans sur IBM i (Adelia), sur des SI critiques de télécom, de banque et de protection sociale.
 
-Je suis aujourd'hui en pivot complet vers COBOL, avec un objectif clair : devenir l'interlocuteur capable de faire le pont entre un système COBOL historique et les besoins actuels — API, intégrations Java, modernisation ciblée sans réécriture complète.
+Ce dépôt documente ma montée en compétences sur COBOL, avec un objectif concret : savoir faire le pont entre un système COBOL historique et les besoins actuels — API, intégration Java, modernisation ciblée sans réécriture complète.
 
-Ce dépôt documente ce pivot : chaque projet est un jalon vers un objectif concret, pas un exercice isolé. L'ambition n'est pas d'apprendre COBOL mais d'exposer mon expertise legacy et ma capacité à le connecter au monde moderne.
+Chaque projet est un jalon vers cet objectif, pas un exercice isolé. Les programmes sont écrits en dialecte Enterprise COBOL (voir `-std=ibm` plus bas) et complètent le parcours IBM Z Xplore, réalisé sur un environnement z/OS réel jusqu'au badge All Star (2026).
 
 ## Journey
 
@@ -38,6 +37,10 @@ Ce dépôt documente ce pivot : chaque projet est un jalon vers un objectif conc
 | 4. [Système Paie 2](projects/systpaii/README.md) (Refactoring Prod)   | 2     | Copybooks, sous-programmes, code réutilisable | ✅ terminé    |
 | 5. [Simulateur de Prêt](projects/simupret/README.md) API COBOL (REST) | 2     | Intégrations modernes                         | 🧑‍💻 en cours   |
 | 6. E-commerce Complet                                                 | 2     | Everything + BD                               | 🚧 non débuté |
+
+## Badges IBM Z Xplore
+
+Parcours réalisé sur un environnement z/OS réel : [IBM Z Xplore – All Star, Advanced et Concepts](https://www.credly.com/users/david-gaba/badges) (septembre – octobre 2026).
 
 ## Stack et outils
 
